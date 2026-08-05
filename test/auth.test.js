@@ -260,3 +260,75 @@ test('잠긴 계정에 더 시도해도 실패 카운터를 늘리지 않는다'
   assert.strictEqual(calls, 0,
     '잠긴 뒤의 시도는 카운터를 늘리지 않아야 한다. 늘리면 잠금 만료가 계속 미뤄져 정당한 사용자가 영구 차단된다.');
 });
+
+test('handleMe는 토큰의 사용자를 돌려주고 해시를 포함하지 않는다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+
+  const out = auth.handleMe({}, user);
+  assert.strictEqual(out.user_id, created.user.user_id);
+  assert.strictEqual(out.password_hash, undefined);
+});
+
+test('프로필 수정은 허용된 필드만 바꾼다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+
+  const out = auth.handleUpdateProfile(
+    { name: '김철수', phone: '010-9999-8888', company: '새회사', position: '이사', birth_date: '1990-01-01' },
+    user
+  );
+
+  assert.strictEqual(out.name, '김철수');
+  assert.strictEqual(out.company, '새회사');
+  const row = sheet.findByPk('Users', created.user.user_id);
+  assert.strictEqual(row.phone, '010-9999-8888');
+  assert.strictEqual(row.birth_date, '1990-01-01');
+});
+
+test('프로필 수정으로 역할·상태·이메일·해시를 바꿀 수 없다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+  const before = sheet.findByPk('Users', created.user.user_id);
+
+  auth.handleUpdateProfile({
+    name: '김철수',
+    role: 'admin',
+    status: 'inactive',
+    email: 'attacker@evil.com',
+    password_hash: '바꿔치기',
+  }, user);
+
+  const after = sheet.findByPk('Users', created.user.user_id);
+  assert.strictEqual(after.role, 'student');
+  assert.strictEqual(after.status, 'active');
+  assert.strictEqual(after.email, 'hong@igm.co.kr');
+  assert.strictEqual(after.password_hash, before.password_hash);
+  assert.strictEqual(after.name, '김철수');
+});
+
+test('프로필 수정은 요청 본문의 user_id를 무시하고 토큰의 사용자만 고친다', () => {
+  fresh();
+  const mine = auth.handleSignup(signupPayload());
+  const other = auth.handleSignup(signupPayload({ email: 'other@igm.co.kr', name: '남의계정' }));
+  const user = sheet.findByPk('Users', mine.user.user_id);
+
+  auth.handleUpdateProfile({ user_id: other.user.user_id, name: '바뀐이름' }, user);
+
+  assert.strictEqual(sheet.findByPk('Users', mine.user.user_id).name, '바뀐이름');
+  assert.strictEqual(sheet.findByPk('Users', other.user.user_id).name, '남의계정');
+});
+
+test('로그아웃하면 세션이 사라진다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+  assert.strictEqual(sheet.readAll('Sessions').length, 1);
+
+  auth.handleLogout({ _token: created.token }, user);
+
+  assert.deepStrictEqual(sheet.readAll('Sessions'), []);
+});

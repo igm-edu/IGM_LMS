@@ -116,6 +116,38 @@ function handleLogin(payload) {
   return { token: issueSession(user.user_id), user: publicUser_(user) };
 }
 
+/**
+ * 본인이 고칠 수 있는 필드. 화이트리스트로 관리한다.
+ * email은 로그인 ID라 중복 검사와 세션 처리가 함께 필요하고, role과 status는
+ * 관리자 권한이며, password_hash는 비밀번호 변경 기능이 따로 있어야 한다.
+ */
+var EDITABLE_PROFILE_FIELDS = ['name', 'phone', 'company', 'position', 'birth_date'];
+
+function handleMe(payload, user) {
+  return publicUser_(user);
+}
+
+function handleUpdateProfile(payload, user) {
+  var patch = {};
+  for (var i = 0; i < EDITABLE_PROFILE_FIELDS.length; i++) {
+    var field = EDITABLE_PROFILE_FIELDS[i];
+    var value = payload[field];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      patch[field] = String(value).trim();
+    }
+  }
+
+  // 대상은 언제나 토큰에서 확인한 사용자다. payload.user_id는 쓰지 않는다.
+  // 받아서 쓰면 남의 계정을 고치는 통로가 된다.
+  var updated = update('Users', user.user_id, patch);
+  return publicUser_(updated);
+}
+
+function handleLogout(payload, user) {
+  revokeSession(payload._token);
+  return { ok: true };
+}
+
 if (typeof module !== 'undefined') {
   var sheetLib = require('../lib/sheet');
   var validateLib = require('../lib/validate');
@@ -138,11 +170,17 @@ if (typeof module !== 'undefined') {
   if (typeof global.logError_ !== 'function') {
     global.logError_ = function () {};
   }
+  global.update = sheetLib.update;
+  global.revokeSession = require('../lib/session').revokeSession;
 
   module.exports = {
     PUBLIC_USER_FIELDS: PUBLIC_USER_FIELDS,
+    EDITABLE_PROFILE_FIELDS: EDITABLE_PROFILE_FIELDS,
     publicUser_: publicUser_,
     handleSignup: handleSignup,
     handleLogin: handleLogin,
+    handleMe: handleMe,
+    handleUpdateProfile: handleUpdateProfile,
+    handleLogout: handleLogout,
   };
 }
