@@ -741,6 +741,9 @@ function verifySession(token, now) {
     throw appError_('TOKEN_INVALID', '로그인이 필요합니다.');
   }
   if (String(user.status) !== 'active') {
+    // 세션을 남겨두면 계정을 다시 활성화했을 때 예전 세션이 재로그인 없이 되살아난다.
+    // 계정 탈취가 의심되어 잠근 경우라면 공격자의 세션까지 부활하므로 지운다.
+    deleteByPk('Sessions', hash);
     throw appError_('ACCOUNT_INACTIVE', '사용할 수 없는 계정입니다.');
   }
 

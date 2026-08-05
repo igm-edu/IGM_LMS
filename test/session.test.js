@@ -124,3 +124,22 @@ test('revokeSession은 세션을 지운다', () => {
   assert.strictEqual(session.revokeSession(token), false);
   assert.strictEqual(session.revokeSession(''), false);
 });
+
+test('비활성 계정의 세션은 삭제되어 재활성화 후에도 재로그인이 필요하다', () => {
+  fresh();
+  const token = session.issueSession('U1');
+  sheet.update('Users', 'U1', { status: 'inactive' });
+
+  assert.throws(() => session.verifySession(token), (err) => {
+    assert.strictEqual(err.appCode, 'ACCOUNT_INACTIVE');
+    return true;
+  });
+  assert.deepStrictEqual(sheet.readAll('Sessions'), [], '세션 행이 지워져야 한다');
+
+  // 다시 활성화해도 그 토큰은 되살아나지 않는다
+  sheet.update('Users', 'U1', { status: 'active' });
+  assert.throws(() => session.verifySession(token), (err) => {
+    assert.strictEqual(err.appCode, 'TOKEN_INVALID');
+    return true;
+  });
+});
