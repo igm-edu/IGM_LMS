@@ -1,0 +1,9 @@
+{
+  "name": "igm-lms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IGM 공개과정 e러닝 LMS",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

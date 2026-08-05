@@ -41,3 +41,6 @@ desktop.ini
 
 # 산출물
 output/
+
+# clasp
+.clasprc.json

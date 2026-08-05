@@ -63,10 +63,12 @@ Node에서 Apps Script 코드를 테스트할 수 있는 토대를 만든다. �
   "private": true,
   "description": "IGM 공개과정 e러닝 LMS",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   }
 }
 ```
+
+테스트 파일을 글로브로 지정하는 이유가 있다. `node --test test/`처럼 디렉터리를 넘기면 Node 24는 이를 `test`라는 모듈 경로로 해석해 `MODULE_NOT_FOUND`로 실패한다. 글로브로 지정하면 `test/helpers/` 아래의 보조 파일이 테스트 대상으로 잡히지도 않는다.
 
 - [ ] **Step 2: `.nojekyll` 생성**
 
@@ -1400,11 +1402,13 @@ Google Drive에서 새 스프레드시트를 만들고 이름을 `IGM_LMS_DB`로
 
 - [ ] **Step 4: Apps Script 프로젝트 생성**
 
-`apps-script` 폴더에서 실행한다.
+`apps-script` 폴더에서 실행한다. clasp 3.x는 명령 이름이 `create-script`로 바뀌었다(`create`도 별칭으로 동작한다).
 
 ```bash
-clasp create --type standalone --title "IGM LMS API" --rootDir .
+clasp create-script --type standalone --title "IGM LMS API" --rootDir .
 ```
+
+이 명령은 `appsscript.json`을 clasp 기본값(시간대 America/New_York, webapp 항목 없음)으로 덮어쓴다. Step 3에서 작성한 내용으로 다시 되돌린 뒤 push해야 한다.
 
 `.clasp.json`이 `apps-script/` 안에 생성된다. 저장소 루트로 옮기고 `rootDir`를 조정할 필요는 없다. 이 파일은 커밋한다.
 
@@ -1432,19 +1436,19 @@ Expected: 스프레드시트에 13개 탭이 생기고 각 탭 1행에 헤더가
 
 Expected: `10000회 해싱: <숫자>ms`
 
-측정값이 1,000ms를 넘으면 `HASH_ITERATIONS`를 낮춘다. 예를 들어 2,500ms가 나왔다면 4,000회 정도가 1초 선에 들어온다. 반대로 300ms 이하로 여유가 크면 20,000회로 올린다. 목표는 로그인 응답을 1초 안에 유지하면서 반복 횟수를 최대화하는 것이다.
+**실측 결과(2026-08-05): 10,000회에 4,671ms.** HMAC 호출당 약 0.47ms다.
 
-값을 조정했다면 `apps-script/lib/hash.js`의 상수를 고치고 `npm test`로 회귀를 확인한 뒤 `clasp push`한다.
+이 수치를 보고 "로그인 1초 이내"라는 당초 기준을 재검토했다. 그 기준을 지키면 1,000회 안팎으로 묶이는데, 로그인은 수강생이 과정 기간에 몇 번 하지 않는 동작이라 1~2초대는 실무에서 받아들여진다. 반면 반복 횟수는 유출 시 공격 비용에 직접 비례한다. **3,000회(약 1.4초)로 확정했다.** 하루 로그인 200회 기준 약 4.7분으로 90분 예산의 5% 수준이다.
+
+값을 조정하면 `apps-script/lib/hash.js`의 상수를 고치고 `npm test`로 회귀를 확인한 뒤 `clasp push`한다.
 
 - [ ] **Step 9: 관리자 계정 생성 확인**
 
-편집기 콘솔에서 실행한다. 이메일과 비밀번호는 실제 사용할 값으로 바꾼다.
+**이 단계는 계획대로 실행할 수 없어 구현을 바꿨다.** Apps Script 편집기의 실행 버튼은 인자 없는 함수만 호출할 수 있고 임의 표현식을 실행할 콘솔이 없다. 임시 래퍼 함수에 비밀번호를 적는 우회는 그 값이 소스 파일에 남아 `clasp pull`로 공개 저장소에 유입될 수 있다.
 
-```js
-seedAdmin('admin@igm.co.kr', '실제로쓸초기비밀번호', '운영자')
-```
+`seedAdmin`이 인자 없이 호출되면 스크립트 속성에서 값을 읽고, 실행 후 그 속성을 스스로 지우도록 확장했다. 프로젝트 설정 > 스크립트 속성에 `SEED_ADMIN_EMAIL`과 `SEED_ADMIN_PASSWORD`를 등록하고(이름을 넣으려면 `SEED_ADMIN_NAME`도) 편집기에서 `seedAdmin`을 실행한다.
 
-Expected: 반환값이 `{ skipped: false, user_id: 'U...' }`
+Expected: 반환값이 `{ skipped: false, user_id: 'U...' }`이고, 실행 후 스크립트 속성 화면을 새로고침하면 등록한 세 속성이 사라져 있다.
 
 Users 시트를 열어 `password_hash` 열이 `pbkdf2$`로 시작하고 비밀번호 원문이 어디에도 보이지 않는지 눈으로 확인한다.
 
