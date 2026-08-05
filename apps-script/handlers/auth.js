@@ -75,6 +75,47 @@ function handleSignup(payload) {
   return { token: token, user: publicUser_(user) };
 }
 
+function handleLogin(payload) {
+  var email = normalizeEmail(payload.email);
+  var password = payload.password;
+  if (!email || !password) {
+    throw appError_('BAD_REQUEST', '이메일과 비밀번호를 입력해 주세요.');
+  }
+
+  // 잠긴 계정은 비밀번호를 검증하지 않고 즉시 거부하며 카운터도 늘리지 않는다.
+  // 늘리면 공격자가 요청을 계속 보내는 것만으로 잠금을 무한히 연장할 수 있다.
+  if (isLocked(email)) {
+    throw appError_('ACCOUNT_LOCKED', '로그인 시도가 많아 잠시 잠겼습니다. 10분 후 다시 시도해 주세요.');
+  }
+
+  var user = findByColumn('Users', 'email', email);
+  var matched = false;
+  if (user) {
+    try {
+      matched = verifyPassword(password, user.password_hash);
+    } catch (err) {
+      // 저장값이 손상되어도 로그인 기능 전체가 죽어서는 안 된다.
+      // 그 계정만 실패시키고 원인 파악을 위해 기록은 남긴다.
+      logError_('auth.login', user.user_id, err);
+      matched = false;
+    }
+  }
+
+  // 이메일이 없는 경우와 비밀번호가 틀린 경우를 구분해 알려주면
+  // 어떤 이메일이 가입돼 있는지 확인하는 수단이 된다. 같은 응답을 준다.
+  if (!user || !matched) {
+    recordFailure(email);
+    throw appError_('INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.');
+  }
+
+  if (String(user.status) !== 'active') {
+    throw appError_('ACCOUNT_INACTIVE', '사용할 수 없는 계정입니다.');
+  }
+
+  clearFailures(email);
+  return { token: issueSession(user.user_id), user: publicUser_(user) };
+}
+
 if (typeof module !== 'undefined') {
   var sheetLib = require('../lib/sheet');
   var validateLib = require('../lib/validate');
@@ -89,10 +130,19 @@ if (typeof module !== 'undefined') {
   global.hashPassword = require('../lib/hash').hashPassword;
   global.issueSession = require('../lib/session').issueSession;
   global.RETENTION_YEARS = require('../setup').RETENTION_YEARS;
+  var ratelimitLib = require('../lib/ratelimit');
+  global.isLocked = ratelimitLib.isLocked;
+  global.recordFailure = ratelimitLib.recordFailure;
+  global.clearFailures = ratelimitLib.clearFailures;
+  global.verifyPassword = require('../lib/hash').verifyPassword;
+  if (typeof global.logError_ !== 'function') {
+    global.logError_ = function () {};
+  }
 
   module.exports = {
     PUBLIC_USER_FIELDS: PUBLIC_USER_FIELDS,
     publicUser_: publicUser_,
     handleSignup: handleSignup,
+    handleLogin: handleLogin,
   };
 }

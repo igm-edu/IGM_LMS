@@ -135,3 +135,128 @@ test('비밀번호는 해시로만 저장된다', () => {
   assert.match(row.password_hash, /^pbkdf2\$/);
   assert.strictEqual(String(row.password_hash).indexOf('abcd1234'), -1);
 });
+
+test('가입한 계정으로 로그인된다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+  const result = auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' });
+  assert.ok(result.token);
+  assert.strictEqual(result.user.email, 'hong@igm.co.kr');
+  assert.strictEqual(result.user.password_hash, undefined);
+});
+
+test('대문자로 입력해도 로그인된다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+  assert.ok(auth.handleLogin({ email: '  HONG@IGM.co.kr ', password: 'abcd1234' }).token);
+});
+
+test('없는 이메일과 틀린 비밀번호가 같은 응답을 준다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+
+  const errors = [];
+  [
+    { email: 'nobody@igm.co.kr', password: 'abcd1234' },
+    { email: 'hong@igm.co.kr', password: 'wrongpass1' },
+  ].forEach((payload) => {
+    try {
+      auth.handleLogin(payload);
+      assert.fail('로그인이 실패해야 한다');
+    } catch (err) {
+      errors.push({ code: err.appCode, message: err.message });
+    }
+  });
+
+  assert.strictEqual(errors[0].code, 'INVALID_CREDENTIALS');
+  assert.deepStrictEqual(errors[0], errors[1], '두 경우의 응답이 달라서는 안 된다');
+});
+
+test('5회 실패하면 잠기고, 잠긴 뒤에는 비밀번호가 맞아도 거부된다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+
+  for (let i = 0; i < 5; i += 1) {
+    assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'wrongpass1' }));
+  }
+
+  assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' }), (err) => {
+    assert.strictEqual(err.appCode, 'ACCOUNT_LOCKED');
+    return true;
+  });
+});
+
+test('로그인에 성공하면 실패 카운터가 지워진다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+
+  for (let i = 0; i < 4; i += 1) {
+    assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'wrongpass1' }));
+  }
+  assert.ok(auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' }).token);
+
+  for (let i = 0; i < 4; i += 1) {
+    assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'wrongpass1' }));
+  }
+  assert.ok(auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' }).token);
+});
+
+test('비활성 계정은 로그인할 수 없다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  sheet.update('Users', created.user.user_id, { status: 'inactive' });
+
+  assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' }), (err) => {
+    assert.strictEqual(err.appCode, 'ACCOUNT_INACTIVE');
+    return true;
+  });
+});
+
+test('저장된 해시가 손상되어도 그 계정만 실패하고 예외가 새지 않는다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  sheet.update('Users', created.user.user_id, { password_hash: '깨진값' });
+
+  assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'abcd1234' }), (err) => {
+    assert.strictEqual(err.appCode, 'INVALID_CREDENTIALS');
+    return true;
+  });
+});
+
+test('이메일이나 비밀번호가 비면 BAD_REQUEST', () => {
+  fresh();
+  assert.throws(() => auth.handleLogin({ email: '', password: 'abcd1234' }), (err) => {
+    assert.strictEqual(err.appCode, 'BAD_REQUEST');
+    return true;
+  });
+  assert.throws(() => auth.handleLogin({ email: 'a@b.com', password: '' }), (err) => {
+    assert.strictEqual(err.appCode, 'BAD_REQUEST');
+    return true;
+  });
+});
+
+test('잠긴 계정에 더 시도해도 실패 카운터를 늘리지 않는다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+  for (let i = 0; i < 5; i += 1) {
+    assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'wrongpass1' }));
+  }
+
+  const original = global.recordFailure;
+  let calls = 0;
+  global.recordFailure = function (key) { calls += 1; return original(key); };
+
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      assert.throws(() => auth.handleLogin({ email: 'hong@igm.co.kr', password: 'wrongpass1' }), (err) => {
+        assert.strictEqual(err.appCode, 'ACCOUNT_LOCKED');
+        return true;
+      });
+    }
+  } finally {
+    global.recordFailure = original;
+  }
+
+  assert.strictEqual(calls, 0,
+    '잠긴 뒤의 시도는 카운터를 늘리지 않아야 한다. 늘리면 잠금 만료가 계속 미뤄져 정당한 사용자가 영구 차단된다.');
+});
