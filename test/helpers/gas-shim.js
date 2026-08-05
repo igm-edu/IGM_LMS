@@ -10,9 +10,19 @@ function toSigned(buf) {
   return out;
 }
 
+// Apps Script의 바이트 배열은 Java의 signed byte(-128..127)다. NaN이나 범위를 벗어난
+// 값을 넘기면 실제 런타임은 변환에 실패한다. Node의 Buffer.from은 그런 값을 조용히
+// 0으로 바꿔버리므로, 대역이 실제보다 관대해지지 않도록 여기서 막는다.
 function toBuffer(value) {
   if (typeof value === 'string') return Buffer.from(value, 'utf8');
-  return Buffer.from(value.map((b) => (b < 0 ? b + 256 : b)));
+  return Buffer.from(
+    value.map((b) => {
+      if (!Number.isInteger(b) || b < -128 || b > 127) {
+        throw new Error('바이트 배열에 올바르지 않은 값이 있습니다: ' + b);
+      }
+      return b < 0 ? b + 256 : b;
+    })
+  );
 }
 
 const Utilities = {

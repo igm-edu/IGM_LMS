@@ -15,6 +15,7 @@ const setup = require('../apps-script/setup');
 
 function emptySpreadsheet() {
   shim.resetShim();
+  sheet.resetSpreadsheetCache_();
   shim.PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', SPREADSHEET_ID);
   return fake.installSpreadsheetApp(SPREADSHEET_ID);
 }

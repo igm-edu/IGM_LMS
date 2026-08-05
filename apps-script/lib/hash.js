@@ -78,6 +78,7 @@ function verifyPassword(password, stored) {
   var iter = parseInt(parts[1], 10);
   if (!iter || iter < 1) return false;
   if (parts[2].length !== 32 || parts[3].length !== 64) return false;
+  if (!/^[0-9a-f]+$/.test(parts[2]) || !/^[0-9a-f]+$/.test(parts[3])) return false;
   var derived = pbkdf2Sha256_(strToBytes_(password), hexToBytes_(parts[2]), iter);
   return constantTimeEquals_(bytesToHex_(derived), parts[3]);
 }

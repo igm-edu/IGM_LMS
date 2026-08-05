@@ -71,6 +71,13 @@ test('형식이 망가진 저장값은 예외 없이 false를 반환한다', () 
   });
 });
 
+test('16진수가 아닌 문자가 섞인 저장값도 예외 없이 false를 반환한다', () => {
+  const badSalt = 'pbkdf2$100$' + 'g'.repeat(32) + '$' + '0'.repeat(64);
+  const badHash = 'pbkdf2$100$' + '0'.repeat(32) + '$' + 'z'.repeat(64);
+  assert.strictEqual(hash.verifyPassword('비밀번호', badSalt), false);
+  assert.strictEqual(hash.verifyPassword('비밀번호', badHash), false);
+});
+
 test('세션 토큰은 64자 16진 문자열이며 매번 다르다', () => {
   const a = hash.generateToken();
   const b = hash.generateToken();

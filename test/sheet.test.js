@@ -13,6 +13,7 @@ const sheet = require('../apps-script/lib/sheet');
 
 function freshSpreadsheet() {
   shim.resetShim();
+  sheet.resetSpreadsheetCache_();
   shim.PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', SPREADSHEET_ID);
   const spreadsheet = fake.installSpreadsheetApp(SPREADSHEET_ID);
   const users = spreadsheet.insertSheet('Users');
@@ -148,4 +149,42 @@ test('행 개수는 그대로인데 순서가 바뀌어도 올바른 레코드�
 
   assert.strictEqual(sheet.findByPk('Users', 'U1').name, '첫째');
   assert.strictEqual(sheet.findByPk('Users', 'U2').name, '둘째');
+});
+
+test('한 실행 안에서는 스프레드시트를 한 번만 연다', () => {
+  freshSpreadsheet();
+  const opened = [];
+  const inner = global.SpreadsheetApp;
+  global.SpreadsheetApp = {
+    openById(id) {
+      opened.push(id);
+      return inner.openById(id);
+    },
+  };
+
+  try {
+    sheet.insert('Users', { user_id: 'U1', name: '첫째' });
+    sheet.findByPk('Users', 'U1');
+    sheet.readAll('Users');
+    assert.strictEqual(opened.length, 1);
+  } finally {
+    global.SpreadsheetApp = inner;
+  }
+});
+
+test('같은 기본키로 두 번 insert하면 거부한다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', name: '첫째' });
+  assert.throws(
+    () => sheet.insert('Users', { user_id: 'U1', name: '중복' }),
+    /이미 존재하는 기본키/
+  );
+  assert.strictEqual(sheet.readAll('Users').length, 1);
+  assert.strictEqual(sheet.findByPk('Users', 'U1').name, '첫째');
+});
+
+test('기본키가 비어 있으면 insert를 거부한다', () => {
+  freshSpreadsheet();
+  assert.throws(() => sheet.insert('Users', { name: '이름만' }), /기본키가 비어 있습니다/);
+  assert.strictEqual(sheet.readAll('Users').length, 0);
 });

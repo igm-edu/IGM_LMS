@@ -5,7 +5,10 @@
 
 var SHEET_CACHE_TTL_SEC = 300;
 
+var cachedSpreadsheet_ = null;
+
 function getSpreadsheet_() {
+  if (cachedSpreadsheet_) return cachedSpreadsheet_;
   var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
   if (!id) {
     throw new Error(
@@ -13,7 +16,13 @@ function getSpreadsheet_() {
       '프로젝트 설정 > 스크립트 속성에서 대상 스프레드시트 ID를 등록하세요.'
     );
   }
-  return SpreadsheetApp.openById(id);
+  cachedSpreadsheet_ = SpreadsheetApp.openById(id);
+  return cachedSpreadsheet_;
+}
+
+/** 테스트에서 실행 경계를 흉내내기 위해 쓴다. Apps Script는 실행마다 컨텍스트가 새로 만들어진다. */
+function resetSpreadsheetCache_() {
+  cachedSpreadsheet_ = null;
 }
 
 function getSheet_(name) {
@@ -111,6 +120,13 @@ function findBy(name, field, value) {
 
 function insert(name, obj) {
   var headers = headersOf_(name);
+  var pk = String(obj[headers[0]] === undefined ? '' : obj[headers[0]]);
+  if (!pk) {
+    throw new Error('기본키가 비어 있습니다: ' + name + '.' + headers[0]);
+  }
+  if (rowIndexOf_(name, pk)) {
+    throw new Error('이미 존재하는 기본키입니다: ' + name + '.' + headers[0] + ' = ' + pk);
+  }
   getSheet_(name).appendRow(objectToRow_(headers, obj));
   return obj;
 }
@@ -166,5 +182,6 @@ if (typeof module !== 'undefined') {
     newId: newId,
     getSheet_: getSheet_,
     getSpreadsheet_: getSpreadsheet_,
+    resetSpreadsheetCache_: resetSpreadsheetCache_,
   };
 }
