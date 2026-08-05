@@ -198,3 +198,46 @@ test('속성도 인자도 없으면 무엇을 등록해야 하는지 알려주�
   assert.throws(() => setup.seedAdmin(), /SEED_ADMIN_PASSWORD/);
   assert.deepStrictEqual(sheet.readAll('Users'), []);
 });
+
+test('관리자가 이미 있으면 등록된 초기 비밀번호 속성도 함께 지운다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+  const props = shim.PropertiesService.getScriptProperties();
+  setup.seedAdmin('first@igm.co.kr', '첫번째비밀번호');
+
+  // 운영자가 실행 버튼을 다시 누르려고 속성을 새로 등록한 상황
+  props.setProperty(setup.SEED_EMAIL_PROPERTY, 'second@igm.co.kr');
+  props.setProperty(setup.SEED_PASSWORD_PROPERTY, '남으면안되는비밀번호');
+
+  const result = setup.seedAdmin();
+
+  assert.strictEqual(result.skipped, true);
+  assert.strictEqual(props.getProperty(setup.SEED_PASSWORD_PROPERTY), null);
+  assert.strictEqual(props.getProperty(setup.SEED_EMAIL_PROPERTY), null);
+  assert.strictEqual(sheet.findBy('Users', 'email', 'second@igm.co.kr'), null);
+});
+
+test('관리자가 이미 있으면 속성이 없어도 오류 대신 건너뛴다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+  setup.seedAdmin('first@igm.co.kr', '첫번째비밀번호');
+
+  // 실행 버튼을 습관적으로 다시 누른 상황. 속성은 이미 지워져 비어 있다.
+  const result = setup.seedAdmin();
+
+  assert.strictEqual(result.skipped, true);
+  assert.match(result.reason, /이미 관리자 계정이 있습니다/);
+});
+
+test('빠진 속성만 골라서 알려준다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+  shim.PropertiesService.getScriptProperties()
+    .setProperty(setup.SEED_EMAIL_PROPERTY, 'admin@igm.co.kr');
+
+  assert.throws(() => setup.seedAdmin(), (err) => {
+    assert.match(err.message, /SEED_ADMIN_PASSWORD/);
+    assert.ok(!err.message.includes(setup.SEED_EMAIL_PROPERTY), '이미 등록된 속성은 안내에서 빠져야 한다');
+    return true;
+  });
+});

@@ -4,8 +4,9 @@
  * 실행 순서
  *   1. 프로젝트 설정 > 스크립트 속성에 SPREADSHEET_ID 등록
  *   2. setupSheets() 실행
- *   3. 스크립트 속성에 SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD 등록 후 seedAdmin() 실행
- *      (계정이 만들어지면 두 속성은 자동으로 삭제된다)
+ *   3. 스크립트 속성에 SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD와
+ *      필요하면 SEED_ADMIN_NAME을 등록한 뒤 seedAdmin() 실행
+ *      (세 속성은 실행 후 자동으로 삭제된다)
  */
 
 var RESET_CONFIRMATION = '모든데이터를삭제합니다';
@@ -58,28 +59,37 @@ function setupSheets() {
  * 최초 관리자 계정을 만든다. 이미 관리자가 있으면 아무것도 하지 않는다.
  *
  * 인자 없이 호출하면 스크립트 속성 SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD /
- * SEED_ADMIN_NAME에서 값을 읽는다. Apps Script 편집기의 실행 버튼은 인자 없는
+ * SEED_ADMIN_NAME(선택)에서 값을 읽는다. Apps Script 편집기의 실행 버튼은 인자 없는
  * 함수만 호출할 수 있어서, 비밀번호를 코드에 적지 않고 계정을 만들려면 이 경로가
- * 필요하다. 계정 생성에 성공하면 세 속성을 즉시 삭제해 초기 비밀번호가 프로젝트
- * 설정에 남지 않게 한다.
+ * 필요하다. 세 속성은 계정을 만든 뒤에도, 이미 관리자가 있어 건너뛴 경우에도 지운다.
+ * 초기 비밀번호가 프로젝트 설정에 남는 경로를 만들지 않기 위해서다.
+ *
+ * "이미 관리자가 있는지"를 자격 증명 검사보다 먼저 확인하는 이유가 있다. 이 함수는
+ * 실행 버튼으로 호출되므로 세팅을 마친 뒤 다시 눌러보는 일이 흔한데, 순서가 반대면
+ * "이미 있습니다"라는 안내 대신 "비밀번호를 등록하세요"라는 오해를 부르는 오류가
+ * 나고, 그 안내를 따라 등록한 비밀번호가 건너뛰기 경로에 남게 된다.
  */
 function seedAdmin(email, password, name) {
   var props = PropertiesService.getScriptProperties();
+
+  var existing = findBy('Users', 'role', 'admin');
+  if (existing) {
+    clearSeedProperties_(props);
+    return { skipped: true, reason: '이미 관리자 계정이 있습니다: ' + existing.email };
+  }
+
   var adminEmail = email || props.getProperty(SEED_EMAIL_PROPERTY);
   var adminPassword = password || props.getProperty(SEED_PASSWORD_PROPERTY);
   var adminName = name || props.getProperty(SEED_NAME_PROPERTY);
 
-  if (!adminEmail || !adminPassword) {
+  var missing = [];
+  if (!adminEmail) missing.push(SEED_EMAIL_PROPERTY);
+  if (!adminPassword) missing.push(SEED_PASSWORD_PROPERTY);
+  if (missing.length) {
     throw new Error(
-      '관리자 이메일과 비밀번호가 없습니다. 프로젝트 설정 > 스크립트 속성에 ' +
-      SEED_EMAIL_PROPERTY + '와 ' + SEED_PASSWORD_PROPERTY +
-      '를 등록한 뒤 다시 실행하세요. 계정이 만들어지면 두 속성은 자동으로 삭제됩니다.'
+      '관리자 정보가 없습니다. 프로젝트 설정 > 스크립트 속성에 ' + missing.join(', ') +
+      '를 등록한 뒤 다시 실행하세요. 계정이 만들어지면 등록한 속성은 자동으로 삭제됩니다.'
     );
-  }
-
-  var existing = findBy('Users', 'role', 'admin');
-  if (existing) {
-    return { skipped: true, reason: '이미 관리자 계정이 있습니다: ' + existing.email };
   }
 
   var now = new Date();
@@ -103,13 +113,16 @@ function seedAdmin(email, password, name) {
   };
 
   insert('Users', user);
+  clearSeedProperties_(props);
 
-  // 초기 비밀번호가 프로젝트 설정에 남아 있지 않도록 지운다.
+  return { skipped: false, user_id: user.user_id };
+}
+
+/** 초기 관리자 정보를 담은 스크립트 속성을 지운다. 비밀번호가 설정에 남지 않게 한다. */
+function clearSeedProperties_(props) {
   props.deleteProperty(SEED_EMAIL_PROPERTY);
   props.deleteProperty(SEED_PASSWORD_PROPERTY);
   props.deleteProperty(SEED_NAME_PROPERTY);
-
-  return { skipped: false, user_id: user.user_id };
 }
 
 /**
