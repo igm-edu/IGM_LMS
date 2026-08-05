@@ -188,3 +188,57 @@ test('기본키가 비어 있으면 insert를 거부한다', () => {
   assert.throws(() => sheet.insert('Users', { name: '이름만' }), /기본키가 비어 있습니다/);
   assert.strictEqual(sheet.readAll('Users').length, 0);
 });
+
+test('findByColumn은 기본키가 아닌 열로 레코드를 찾는다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', name: '첫째', email: 'a@b.com' });
+  sheet.insert('Users', { user_id: 'U2', name: '둘째', email: 'c@d.com' });
+
+  const found = sheet.findByColumn('Users', 'email', 'c@d.com');
+  assert.strictEqual(found.user_id, 'U2');
+  assert.strictEqual(found.name, '둘째');
+});
+
+test('findByColumn은 찾지 못하면 null을 돌려준다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', email: 'a@b.com' });
+  assert.strictEqual(sheet.findByColumn('Users', 'email', 'x@y.com'), null);
+});
+
+test('findByColumn은 헤더만 있는 시트에서도 null을 돌려준다', () => {
+  freshSpreadsheet();
+  assert.strictEqual(sheet.findByColumn('Users', 'email', 'a@b.com'), null);
+});
+
+test('findByColumn은 값이 여럿이면 가장 위의 행을 돌려준다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', name: '위', email: 'same@b.com' });
+  sheet.insert('Users', { user_id: 'U2', name: '아래', email: 'same@b.com' });
+  assert.strictEqual(sheet.findByColumn('Users', 'email', 'same@b.com').name, '위');
+});
+
+test('findByColumn은 정의되지 않은 열 이름을 거부한다', () => {
+  freshSpreadsheet();
+  assert.throws(() => sheet.findByColumn('Users', '없는열', 'x'), /정의되지 않은 열/);
+});
+
+test('findByColumn은 시트 전체가 아니라 해당 열만 읽는다', () => {
+  const { users } = freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', email: 'a@b.com' });
+
+  const widths = [];
+  const original = users.getRange;
+  users.getRange = function (row, col, numRows, numCols) {
+    widths.push(numCols === undefined ? 1 : numCols);
+    return original.call(users, row, col, numRows, numCols);
+  };
+
+  try {
+    sheet.findByColumn('Users', 'email', 'a@b.com');
+  } finally {
+    users.getRange = original;
+  }
+
+  // 첫 호출은 열 하나만 훑는 스캔이어야 한다. 전체 폭을 읽으면 이 검사가 깨진다.
+  assert.strictEqual(widths[0], 1);
+});
