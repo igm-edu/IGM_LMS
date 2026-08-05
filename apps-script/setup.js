@@ -174,5 +174,6 @@ if (typeof module !== 'undefined') {
     setupSheets: setupSheets,
     seedAdmin: seedAdmin,
     resetAllSheets: resetAllSheets,
+    RETENTION_YEARS: RETENTION_YEARS,
   };
 }
