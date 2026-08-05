@@ -158,3 +158,43 @@ test('임시 시트가 남아 있어도 resetAllSheets가 동작한다', () => {
   assert.strictEqual(spreadsheet.getSheets().length, 13);
   assert.strictEqual(spreadsheet.getSheetByName(setup.RESET_PLACEHOLDER_NAME), null);
 });
+
+test('인자 없이 호출하면 스크립트 속성에서 관리자 정보를 읽는다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+  const props = shim.PropertiesService.getScriptProperties();
+  props.setProperty(setup.SEED_EMAIL_PROPERTY, 'admin@igm.co.kr');
+  props.setProperty(setup.SEED_PASSWORD_PROPERTY, '속성으로넘긴비밀번호');
+  props.setProperty(setup.SEED_NAME_PROPERTY, '운영자');
+
+  const result = setup.seedAdmin();
+
+  assert.strictEqual(result.skipped, false);
+  const admin = sheet.findBy('Users', 'email', 'admin@igm.co.kr');
+  assert.strictEqual(admin.name, '운영자');
+  assert.strictEqual(admin.role, 'admin');
+  assert.strictEqual(hash.verifyPassword('속성으로넘긴비밀번호', admin.password_hash), true);
+});
+
+test('계정을 만든 뒤 초기 비밀번호 속성을 지운다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+  const props = shim.PropertiesService.getScriptProperties();
+  props.setProperty(setup.SEED_EMAIL_PROPERTY, 'admin@igm.co.kr');
+  props.setProperty(setup.SEED_PASSWORD_PROPERTY, '지워져야하는비밀번호');
+  props.setProperty(setup.SEED_NAME_PROPERTY, '운영자');
+
+  setup.seedAdmin();
+
+  assert.strictEqual(props.getProperty(setup.SEED_PASSWORD_PROPERTY), null);
+  assert.strictEqual(props.getProperty(setup.SEED_EMAIL_PROPERTY), null);
+  assert.strictEqual(props.getProperty(setup.SEED_NAME_PROPERTY), null);
+});
+
+test('속성도 인자도 없으면 무엇을 등록해야 하는지 알려주며 실패한다', () => {
+  emptySpreadsheet();
+  setup.setupSheets();
+
+  assert.throws(() => setup.seedAdmin(), /SEED_ADMIN_PASSWORD/);
+  assert.deepStrictEqual(sheet.readAll('Users'), []);
+});
