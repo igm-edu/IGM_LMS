@@ -1,0 +1,43 @@
+# 비밀정보
+.env
+.env.*
+*.key
+*.pem
+credentials*.json
+secrets*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Office 임시 파일
+~$*.docx
+~$*.xlsx
+~$*.pptx
+~$*.pptm
+*.tmp
+
+# Windows / macOS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 편집기
+.vscode/
+.idea/
+
+# 산출물
+output/
