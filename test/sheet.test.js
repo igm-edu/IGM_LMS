@@ -121,3 +121,31 @@ test('newId는 접두어를 붙인 고유 문자열을 만든다', () => {
   assert.match(a, /^U[0-9A-F]{12}$/);
   assert.notStrictEqual(a, b);
 });
+
+function userRow_(userId, name) {
+  return SHEETS.Users.map((header) => {
+    if (header === 'user_id') return userId;
+    if (header === 'name') return name;
+    return '';
+  });
+}
+
+test('행 개수는 그대로인데 순서가 바뀌어도 올바른 레코드를 찾는다', () => {
+  const { users } = freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', name: '첫째' });
+  sheet.insert('Users', { user_id: 'U2', name: '둘째' });
+
+  // 캐시에 U1=행2, U2=행3을 채운다
+  assert.strictEqual(sheet.findByPk('Users', 'U1').name, '첫째');
+  assert.strictEqual(sheet.findByPk('Users', 'U2').name, '둘째');
+
+  // 관리자가 시트를 정렬해 두 행을 맞바꿨다. 행 개수는 그대로이므로
+  // 캐시의 행 번호는 범위 안에 있고, A열 값 대조만이 어긋남을 잡아낼 수 있다.
+  users.getRange(2, 1, 2, SHEETS.Users.length).setValues([
+    userRow_('U2', '둘째'),
+    userRow_('U1', '첫째'),
+  ]);
+
+  assert.strictEqual(sheet.findByPk('Users', 'U1').name, '첫째');
+  assert.strictEqual(sheet.findByPk('Users', 'U2').name, '둘째');
+});
