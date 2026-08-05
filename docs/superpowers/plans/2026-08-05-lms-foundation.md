@@ -63,10 +63,12 @@ Node에서 Apps Script 코드를 테스트할 수 있는 토대를 만든다. �
   "private": true,
   "description": "IGM 공개과정 e러닝 LMS",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   }
 }
 ```
+
+테스트 파일을 글로브로 지정하는 이유가 있다. `node --test test/`처럼 디렉터리를 넘기면 Node 24는 이를 `test`라는 모듈 경로로 해석해 `MODULE_NOT_FOUND`로 실패한다. 글로브로 지정하면 `test/helpers/` 아래의 보조 파일이 테스트 대상으로 잡히지도 않는다.
 
 - [ ] **Step 2: `.nojekyll` 생성**
 
