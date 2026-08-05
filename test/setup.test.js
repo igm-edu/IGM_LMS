@@ -132,3 +132,28 @@ test('resetAllSheets는 확인 문자열이 맞으면 전부 비우고 다시 �
   assert.strictEqual(result.created.length, 13);
   assert.deepStrictEqual(sheet.readAll('Users'), []);
 });
+
+test('관리 대상 시트만 있는 상태에서도 resetAllSheets가 끝까지 완료된다', () => {
+  const spreadsheet = emptySpreadsheet();
+  setup.setupSheets();
+  sheet.insert('Users', { user_id: 'U1', name: '지워짐' });
+  assert.strictEqual(spreadsheet.getSheets().length, 13);
+
+  setup.resetAllSheets(setup.RESET_CONFIRMATION);
+
+  assert.strictEqual(spreadsheet.getSheets().length, 13);
+  assert.strictEqual(spreadsheet.getSheetByName(setup.RESET_PLACEHOLDER_NAME), null);
+  assert.deepStrictEqual(sheet.readAll('Users'), []);
+  assert.deepStrictEqual(sheet.readAll('Classes'), []);
+});
+
+test('임시 시트가 남아 있어도 resetAllSheets가 동작한다', () => {
+  const spreadsheet = emptySpreadsheet();
+  setup.setupSheets();
+  spreadsheet.insertSheet(setup.RESET_PLACEHOLDER_NAME);
+
+  setup.resetAllSheets(setup.RESET_CONFIRMATION);
+
+  assert.strictEqual(spreadsheet.getSheets().length, 13);
+  assert.strictEqual(spreadsheet.getSheetByName(setup.RESET_PLACEHOLDER_NAME), null);
+});

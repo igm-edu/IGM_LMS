@@ -8,6 +8,7 @@
  */
 
 var RESET_CONFIRMATION = '모든데이터를삭제합니다';
+var RESET_PLACEHOLDER_NAME = '__reset_tmp__';
 var RETENTION_YEARS = 3;
 
 /**
@@ -96,12 +97,23 @@ function resetAllSheets(confirmation) {
   }
 
   var spreadsheet = getSpreadsheet_();
+
+  // Apps Script는 스프레드시트의 마지막 남은 시트를 지우지 못한다.
+  // 관리 대상 13개가 전부인 상태에서 순서대로 지우면 마지막 하나에서 예외가 나고
+  // 이미 지워진 12개는 복구되지 않는다. 임시 시트를 하나 세워 두고 작업한다.
+  var placeholder = spreadsheet.getSheetByName(RESET_PLACEHOLDER_NAME);
+  if (!placeholder) {
+    placeholder = spreadsheet.insertSheet(RESET_PLACEHOLDER_NAME);
+  }
+
   Object.keys(SHEETS).forEach(function (name) {
     var sheet = spreadsheet.getSheetByName(name);
     if (sheet) spreadsheet.deleteSheet(sheet);
   });
 
-  return setupSheets();
+  var result = setupSheets();
+  spreadsheet.deleteSheet(placeholder);
+  return result;
 }
 
 if (typeof module !== 'undefined') {
@@ -115,6 +127,7 @@ if (typeof module !== 'undefined') {
 
   module.exports = {
     RESET_CONFIRMATION: RESET_CONFIRMATION,
+    RESET_PLACEHOLDER_NAME: RESET_PLACEHOLDER_NAME,
     setupSheets: setupSheets,
     seedAdmin: seedAdmin,
     resetAllSheets: resetAllSheets,

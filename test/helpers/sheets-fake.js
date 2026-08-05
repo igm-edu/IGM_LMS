@@ -66,6 +66,9 @@ function createSpreadsheet() {
       return sheet;
     },
     deleteSheet(sheet) {
+      if (sheets.length <= 1) {
+        throw new Error('You can\'t remove all the sheets in a document.');
+      }
       const index = sheets.indexOf(sheet);
       if (index >= 0) sheets.splice(index, 1);
     },
