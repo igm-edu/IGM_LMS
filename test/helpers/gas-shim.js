@@ -44,6 +44,22 @@ const Utilities = {
   },
 };
 
+const ContentService = {
+  MimeType: { JSON: 'application/json', TEXT: 'text/plain' },
+  createTextOutput(content) {
+    let mimeType = 'text/plain';
+    const output = {
+      getContent: () => content,
+      getMimeType: () => mimeType,
+      setMimeType(type) {
+        mimeType = type;
+        return output;
+      },
+    };
+    return output;
+  },
+};
+
 const cacheStore = new Map();
 const CacheService = {
   getScriptCache() {
@@ -70,6 +86,7 @@ function installGlobals() {
   global.Utilities = Utilities;
   global.CacheService = CacheService;
   global.PropertiesService = PropertiesService;
+  global.ContentService = ContentService;
 }
 
 function resetShim() {
@@ -81,6 +98,7 @@ module.exports = {
   Utilities,
   CacheService,
   PropertiesService,
+  ContentService,
   toSigned,
   toBuffer,
   installGlobals,
