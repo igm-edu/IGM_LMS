@@ -44,31 +44,46 @@ function handleSignup(payload) {
     throw appError_('BAD_REQUEST', passwordError);
   }
 
-  if (findByColumn('Users', 'email', email)) {
-    throw appError_('EMAIL_TAKEN', '이미 가입된 이메일입니다.');
-  }
+  // 해싱은 약 1.4초가 걸린다. 잠금을 잡은 채로 해싱까지 하면 가입 폭주가
+  // 몰리는 바로 그 순간에 모든 요청이 직렬화된다. 잠금 밖에서 먼저 끝낸다.
+  var passwordHash = hashPassword(payload.password);
 
   var now = new Date();
   var retention = new Date(now.getTime());
   retention.setFullYear(retention.getFullYear() + RETENTION_YEARS);
 
-  var user = {
-    user_id: newId('U'),
-    name: String(payload.name).trim(),
-    email: email,
-    password_hash: hashPassword(payload.password),
-    phone: String(payload.phone).trim(),
-    company: String(payload.company).trim(),
-    position: String(payload.position).trim(),
-    birth_date: String(payload.birth_date).trim(),
-    role: 'student',
-    status: 'active',
-    consent_at: now,
-    retention_until: retention,
-    created_at: now,
-  };
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (lockError) {
+    throw appError_('BAD_REQUEST', '요청이 몰리고 있습니다. 잠시 후 다시 시도해 주세요.');
+  }
 
-  insert('Users', user);
+  var user;
+  try {
+    // 확인과 저장 사이에 다른 요청이 끼어들면 같은 이메일로 계정이 둘 생긴다.
+    if (findByColumn('Users', 'email', email)) {
+      throw appError_('EMAIL_TAKEN', '이미 가입된 이메일입니다.');
+    }
+    user = {
+      user_id: newId('U'),
+      name: String(payload.name).trim(),
+      email: email,
+      password_hash: passwordHash,
+      phone: String(payload.phone).trim(),
+      company: String(payload.company).trim(),
+      position: String(payload.position).trim(),
+      birth_date: String(payload.birth_date).trim(),
+      role: 'student',
+      status: 'active',
+      consent_at: now,
+      retention_until: retention,
+      created_at: now,
+    };
+    insert('Users', user);
+  } finally {
+    lock.releaseLock();
+  }
 
   // 별도 승인 절차가 없으므로 가입 직후 바로 로그인 상태로 넘긴다.
   var token = issueSession(user.user_id, now);
@@ -185,6 +200,16 @@ if (typeof module !== 'undefined') {
   }
   global.update = sheetLib.update;
   global.revokeSession = require('../lib/session').revokeSession;
+  // LockService는 Apps Script 런타임의 전역이다. Node에서는 테스트 셰임이
+  // installGlobals()로 미리 채워 넣지 않는 한 존재하지 않으므로, 여기서는
+  // 아무 것도 하지 않는 대체 구현으로 채워 코드가 죽지 않게만 한다.
+  if (typeof global.LockService === 'undefined') {
+    global.LockService = {
+      getScriptLock: function () {
+        return { waitLock: function () {}, releaseLock: function () {} };
+      },
+    };
+  }
 
   module.exports = {
     PUBLIC_USER_FIELDS: PUBLIC_USER_FIELDS,

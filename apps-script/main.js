@@ -42,7 +42,8 @@ function doPost(e) {
     var request = parseRequest_(e);
     action = request.action;
 
-    var route = routes_()[action];
+    var routes = routes_();
+    var route = Object.prototype.hasOwnProperty.call(routes, action) ? routes[action] : null;
     if (!route) {
       throw appError_('UNKNOWN_ACTION', '알 수 없는 요청입니다.');
     }
@@ -51,8 +52,15 @@ function doPost(e) {
     if (route.roles !== PUBLIC) {
       user = verifySession(request.token);
       userId = user.user_id;
-      if (route.roles !== ANY_USER && route.roles.indexOf(String(user.role)) === -1) {
-        throw appError_('FORBIDDEN', '권한이 없습니다.');
+      if (route.roles !== ANY_USER) {
+        // roles는 반드시 배열이어야 한다. 문자열을 넣으면 indexOf가 부분 문자열을
+        // 찾아 조용히 통과시킨다. 잘못된 표는 요청을 막고 기록으로 남긴다.
+        if (!Array.isArray(route.roles)) {
+          throw new Error('라우팅 표의 roles가 배열이 아닙니다: ' + action);
+        }
+        if (route.roles.indexOf(String(user.role)) === -1) {
+          throw appError_('FORBIDDEN', '권한이 없습니다.');
+        }
       }
     }
 

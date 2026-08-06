@@ -44,3 +44,46 @@ test('성공하면 카운터가 지워진다', () => {
   assert.strictEqual(ratelimit.isLocked('a@b.com'), false);
   assert.strictEqual(ratelimit.recordFailure('a@b.com'), 1);
 });
+
+test('첫 잠금은 10분 뒤 저절로 풀린다', () => {
+  fresh();
+  for (let i = 0; i < 5; i += 1) ratelimit.recordFailure('a@b.com');
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), true);
+
+  shim.advanceClock(9 * 60 * 1000);
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), true, '9분 뒤에는 아직 잠겨 있어야 한다');
+
+  shim.advanceClock(2 * 60 * 1000);
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), false, '10분이 지나면 풀려야 한다');
+});
+
+test('잠금이 풀린 뒤 다시 실패하면 잠금 시간이 길어진다', () => {
+  fresh();
+  for (let i = 0; i < 5; i += 1) ratelimit.recordFailure('a@b.com');
+  shim.advanceClock(11 * 60 * 1000);
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), false);
+
+  for (let i = 0; i < 5; i += 1) ratelimit.recordFailure('a@b.com');
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), true);
+
+  shim.advanceClock(11 * 60 * 1000);
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), true, '두 번째 잠금은 10분보다 길어야 한다');
+
+  shim.advanceClock(60 * 60 * 1000);
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), false, '1시간이 지나면 풀려야 한다');
+});
+
+test('잠금 단계는 마지막 값에서 멈춘다', () => {
+  assert.strictEqual(ratelimit.lockSecondsFor_(5), 600);
+  assert.strictEqual(ratelimit.lockSecondsFor_(10), 3600);
+  assert.strictEqual(ratelimit.lockSecondsFor_(15), 21600);
+  assert.strictEqual(ratelimit.lockSecondsFor_(50), 21600);
+});
+
+test('성공하면 잠금과 카운터가 모두 지워진다', () => {
+  fresh();
+  for (let i = 0; i < 5; i += 1) ratelimit.recordFailure('a@b.com');
+  ratelimit.clearFailures('a@b.com');
+  assert.strictEqual(ratelimit.isLocked('a@b.com'), false);
+  assert.strictEqual(ratelimit.recordFailure('a@b.com'), 1, '카운터가 1부터 다시 시작해야 한다');
+});

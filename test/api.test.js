@@ -149,6 +149,48 @@ test('로그아웃하면 그 토큰이 더는 통하지 않는다', () => {
   assert.strictEqual(after.error.code, 'TOKEN_INVALID');
 });
 
+test('roles가 배열이 아닌 라우트는 통과시키지 않고 기록한다', () => {
+  fresh();
+  post('auth.signup', SIGNUP);
+  const login = post('auth.login', { email: 'hong@igm.co.kr', password: 'abcd1234' });
+
+  main.routes_()['test.badroles'] = { handler: function () { return { reached: true }; }, roles: 'admin' };
+
+  try {
+    const response = post('test.badroles', {}, login.data.token);
+    assert.strictEqual(response.ok, false, '잘못된 roles는 통과해서는 안 된다');
+    assert.strictEqual(response.error.code, 'INTERNAL');
+    assert.strictEqual(sheet.readAll('ErrorLog').length, 1);
+  } finally {
+    delete main.routes_()['test.badroles'];
+  }
+});
+
+test('배열 roles는 역할이 맞지 않으면 FORBIDDEN', () => {
+  fresh();
+  post('auth.signup', SIGNUP);
+  const login = post('auth.login', { email: 'hong@igm.co.kr', password: 'abcd1234' });
+
+  main.routes_()['test.adminonly'] = { handler: function () { return { reached: true }; }, roles: ['admin'] };
+
+  try {
+    const response = post('test.adminonly', {}, login.data.token);
+    assert.strictEqual(response.ok, false);
+    assert.strictEqual(response.error.code, 'FORBIDDEN');
+  } finally {
+    delete main.routes_()['test.adminonly'];
+  }
+});
+
+test('Object 프로토타입 속성 이름도 UNKNOWN_ACTION으로 거부한다', () => {
+  fresh();
+  ['constructor', 'toString', 'hasOwnProperty', '__proto__'].forEach((name) => {
+    const response = post(name, {});
+    assert.strictEqual(response.ok, false, `${name}이 통과했다`);
+    assert.strictEqual(response.error.code, 'UNKNOWN_ACTION', `${name}의 오류 코드가 다르다`);
+  });
+});
+
 test('doGet은 상태만 알려주고 데이터를 다루지 않는다', () => {
   fresh();
   const response = JSON.parse(main.doGet().getContent());

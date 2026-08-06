@@ -369,3 +369,27 @@ test('보내지 않은 항목은 그대로 유지된다', () => {
   assert.strictEqual(row.phone, '010-1234-5678');
   assert.strictEqual(row.company, '아이지엠');
 });
+
+test('가입은 중복 확인과 저장을 잠금으로 감싼다', () => {
+  fresh();
+  const before = shim.lockStats();
+  auth.handleSignup(signupPayload());
+  const after = shim.lockStats();
+
+  assert.strictEqual(after.waits - before.waits, 1, '잠금을 획득해야 한다');
+  assert.strictEqual(after.releases - before.releases, 1, '잠금을 반드시 반납해야 한다');
+});
+
+test('중복 이메일로 실패해도 잠금은 반납된다', () => {
+  fresh();
+  auth.handleSignup(signupPayload());
+  const before = shim.lockStats();
+
+  assert.throws(() => auth.handleSignup(signupPayload()), (err) => {
+    assert.strictEqual(err.appCode, 'EMAIL_TAKEN');
+    return true;
+  });
+
+  const after = shim.lockStats();
+  assert.strictEqual(after.releases - before.releases, 1, '실패 경로에서도 반납해야 한다');
+});
