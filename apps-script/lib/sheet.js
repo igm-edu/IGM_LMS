@@ -118,6 +118,34 @@ function findBy(name, field, value) {
   return null;
 }
 
+/**
+ * 기본키가 아닌 열로 레코드를 찾는다.
+ * readAll이 시트 전체를 읽는 것과 달리 해당 열 하나만 훑어 행 번호를 찾고
+ * 그 행만 다시 읽는다. 호출은 두 번이지만 각 payload가 훨씬 작다.
+ * 일치하는 행이 여럿이면 가장 위의 행을 돌려준다.
+ */
+function findByColumn(name, field, value) {
+  var headers = headersOf_(name);
+  var columnIndex = headers.indexOf(field);
+  if (columnIndex === -1) {
+    throw new Error('정의되지 않은 열입니다: ' + name + '.' + field);
+  }
+
+  var sheet = getSheet_(name);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  var column = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getValues();
+  var target = String(value);
+  for (var i = 0; i < column.length; i++) {
+    if (String(column[i][0]) === target) {
+      var row = sheet.getRange(i + 2, 1, 1, headers.length).getValues()[0];
+      return rowToObject_(headers, row);
+    }
+  }
+  return null;
+}
+
 function insert(name, obj) {
   var headers = headersOf_(name);
   var pk = String(obj[headers[0]] === undefined ? '' : obj[headers[0]]);
@@ -175,6 +203,7 @@ if (typeof module !== 'undefined') {
     readAll: readAll,
     findByPk: findByPk,
     findBy: findBy,
+    findByColumn: findByColumn,
     insert: insert,
     update: update,
     upsert: upsert,

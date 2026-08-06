@@ -44,16 +44,64 @@ const Utilities = {
   },
 };
 
+const ContentService = {
+  MimeType: { JSON: 'application/json', TEXT: 'text/plain' },
+  createTextOutput(content) {
+    let mimeType = 'text/plain';
+    const output = {
+      getContent: () => content,
+      getMimeType: () => mimeType,
+      setMimeType(type) {
+        mimeType = type;
+        return output;
+      },
+    };
+    return output;
+  },
+};
+
 const cacheStore = new Map();
+let clockOffsetMs = 0;
+
+function nowMs() {
+  return Date.now() + clockOffsetMs;
+}
+
+// Apps Script의 CacheService는 만료 시간을 최대 6시간(21600초)까지만 받는다.
+const CACHE_MAX_TTL_SECONDS = 21600;
+const CACHE_DEFAULT_TTL_SECONDS = 600;
+
 const CacheService = {
   getScriptCache() {
     return {
-      get: (key) => (cacheStore.has(key) ? cacheStore.get(key) : null),
-      put: (key, value) => { cacheStore.set(key, String(value)); },
-      remove: (key) => { cacheStore.delete(key); },
+      get(key) {
+        const entry = cacheStore.get(key);
+        if (!entry) return null;
+        if (nowMs() >= entry.expiresAt) {
+          cacheStore.delete(key);
+          return null;
+        }
+        return entry.value;
+      },
+      put(key, value, seconds) {
+        let ttl = seconds === undefined || seconds === null
+          ? CACHE_DEFAULT_TTL_SECONDS
+          : Number(seconds);
+        if (!(ttl > 0)) ttl = CACHE_DEFAULT_TTL_SECONDS;
+        if (ttl > CACHE_MAX_TTL_SECONDS) ttl = CACHE_MAX_TTL_SECONDS;
+        cacheStore.set(key, { value: String(value), expiresAt: nowMs() + ttl * 1000 });
+      },
+      remove(key) {
+        cacheStore.delete(key);
+      },
     };
   },
 };
+
+/** 테스트에서 시간이 흐른 상황을 만든다. */
+function advanceClock(ms) {
+  clockOffsetMs += ms;
+}
 
 const propertyStore = new Map();
 const PropertiesService = {
@@ -66,23 +114,52 @@ const PropertiesService = {
   },
 };
 
+const lockCalls = { waits: 0, releases: 0 };
+
+const LockService = {
+  getScriptLock() {
+    return {
+      waitLock(timeoutMs) {
+        lockCalls.waits += 1;
+        return true;
+      },
+      releaseLock() {
+        lockCalls.releases += 1;
+      },
+    };
+  },
+};
+
+function lockStats() {
+  return { waits: lockCalls.waits, releases: lockCalls.releases };
+}
+
 function installGlobals() {
   global.Utilities = Utilities;
   global.CacheService = CacheService;
   global.PropertiesService = PropertiesService;
+  global.ContentService = ContentService;
+  global.LockService = LockService;
 }
 
 function resetShim() {
   cacheStore.clear();
   propertyStore.clear();
+  clockOffsetMs = 0;
+  lockCalls.waits = 0;
+  lockCalls.releases = 0;
 }
 
 module.exports = {
   Utilities,
   CacheService,
   PropertiesService,
+  ContentService,
+  LockService,
   toSigned,
   toBuffer,
   installGlobals,
   resetShim,
+  advanceClock,
+  lockStats,
 };
