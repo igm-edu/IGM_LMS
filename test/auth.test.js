@@ -332,3 +332,40 @@ test('로그아웃하면 세션이 사라진다', () => {
 
   assert.deepStrictEqual(sheet.readAll('Sessions'), []);
 });
+
+test('필수 항목을 비우려는 수정은 오류로 거부한다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+
+  assert.throws(() => auth.handleUpdateProfile({ phone: '' }, user), (err) => {
+    assert.strictEqual(err.appCode, 'BAD_REQUEST');
+    assert.match(err.message, /phone/);
+    return true;
+  });
+
+  assert.strictEqual(sheet.findByPk('Users', created.user.user_id).phone, '010-1234-5678');
+});
+
+test('공백만 보내거나 null을 보내도 비우려는 시도로 본다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+
+  assert.throws(() => auth.handleUpdateProfile({ company: '   ' }, user), /비울 수 없는/);
+  assert.throws(() => auth.handleUpdateProfile({ company: null }, user), /비울 수 없는/);
+  assert.strictEqual(sheet.findByPk('Users', created.user.user_id).company, '아이지엠');
+});
+
+test('보내지 않은 항목은 그대로 유지된다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  const user = sheet.findByPk('Users', created.user.user_id);
+
+  auth.handleUpdateProfile({ name: '김철수' }, user);
+
+  const row = sheet.findByPk('Users', created.user.user_id);
+  assert.strictEqual(row.name, '김철수');
+  assert.strictEqual(row.phone, '010-1234-5678');
+  assert.strictEqual(row.company, '아이지엠');
+});

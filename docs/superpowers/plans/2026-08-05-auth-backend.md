@@ -1402,12 +1402,25 @@ function handleMe(payload, user) {
 
 function handleUpdateProfile(payload, user) {
   var patch = {};
+  var blanked = [];
+
   for (var i = 0; i < EDITABLE_PROFILE_FIELDS.length; i++) {
     var field = EDITABLE_PROFILE_FIELDS[i];
+    // 아예 보내지 않은 항목은 건드리지 않는다. 부분 수정을 지원하기 위해서다.
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) continue;
+
     var value = payload[field];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      patch[field] = String(value).trim();
+    if (value === undefined || value === null || String(value).trim() === '') {
+      // 보내긴 했는데 비어 있다면 "지우겠다"는 뜻이다. 다섯 항목 모두 가입 시
+      // 필수라 비울 수 없으므로, 조용히 무시하는 대신 그렇다고 알려준다.
+      blanked.push(field);
+      continue;
     }
+    patch[field] = String(value).trim();
+  }
+
+  if (blanked.length) {
+    throw appError_('BAD_REQUEST', '비울 수 없는 항목입니다: ' + blanked.join(', '));
   }
 
   // 대상은 언제나 토큰에서 확인한 사용자다. payload.user_id는 쓰지 않는다.
