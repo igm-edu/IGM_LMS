@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IGM 이러닝</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1 class="brand">IGM 이러닝</h1>
+
+    <section id="view-login">
+      <h2>로그인</h2>
+      <form id="form-login" novalidate>
+        <label>이메일<input type="email" name="email" autocomplete="email" required></label>
+        <label>비밀번호<input type="password" name="password" autocomplete="current-password" required></label>
+        <p class="message" id="message-login" role="alert"></p>
+        <button type="submit">로그인</button>
+      </form>
+      <p class="switch">처음이신가요? <button type="button" class="link" id="go-signup">회원가입</button></p>
+    </section>
+
+    <section id="view-signup" hidden>
+      <h2>회원가입</h2>
+      <form id="form-signup" novalidate>
+        <label>이름<input name="name" autocomplete="name" required></label>
+        <label>이메일<input type="email" name="email" autocomplete="email" required></label>
+        <label>비밀번호<input type="password" name="password" autocomplete="new-password" required>
+          <span class="hint">8자 이상, 영문과 숫자를 모두 포함</span></label>
+        <label>연락처<input name="phone" autocomplete="tel" required></label>
+        <label>소속<input name="company" autocomplete="organization" required></label>
+        <label>직급<input name="position" autocomplete="organization-title" required></label>
+        <label>생년월일<input type="date" name="birth_date" required></label>
+        <label class="consent">
+          <input type="checkbox" name="consent" required>
+          <span>개인정보 수집·이용에 동의합니다. 이름·이메일·연락처·소속·직급·생년월일을
+          수강 관리와 수료증 발급에 사용하며, 수료 후 3년간 보관합니다.</span>
+        </label>
+        <p class="message" id="message-signup" role="alert"></p>
+        <button type="submit">가입하고 시작하기</button>
+      </form>
+      <p class="switch">이미 계정이 있으신가요? <button type="button" class="link" id="go-login">로그인</button></p>
+    </section>
+
+    <section id="view-home" hidden>
+      <h2>환영합니다</h2>
+      <p><strong id="home-name"></strong><span id="home-company"></span></p>
+      <p class="note">수강 중인 과정은 곧 이곳에 표시됩니다.</p>
+      <button type="button" id="do-logout">로그아웃</button>
+    </section>
+  </main>
+
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
