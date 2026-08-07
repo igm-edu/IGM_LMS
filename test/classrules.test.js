@@ -62,3 +62,16 @@ test('순서 값이 깨진 차시는 계산에서 건너뛴다', () => {
   assert.strictEqual(validate.nextLessonOrder([{ lesson_order: '' }, { lesson_order: 3 }]), 4);
   assert.strictEqual(validate.nextLessonOrder([{ lesson_order: 'abc' }]), 1);
 });
+
+test('숫자나 문자열이 아닌 값은 백분율로 받지 않는다', () => {
+  // 체크박스가 잘못 연결되어 false가 넘어오면 Number(false)가 0이라
+  // 출결 기준이 0%로 저장되고, 아무도 보지 않아도 전원 출석 처리된다.
+  [true, false, [], {}, [50], function () {}].forEach((bad) => {
+    assert.strictEqual(validate.isPercentInRange(bad), false, `막아야 함: ${String(bad)}`);
+  });
+});
+
+test('숫자와 문자열 숫자는 그대로 통과한다', () => {
+  assert.strictEqual(validate.isPercentInRange(80), true);
+  assert.strictEqual(validate.isPercentInRange('80'), true);
+});

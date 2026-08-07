@@ -65,7 +65,10 @@ function isHttpsUrl(value) {
  * 폼과 시트에서 문자열로 오므로 문자열 숫자도 허용한다.
  */
 function isPercentInRange(value) {
-  if (value === undefined || value === null) return false;
+  // 숫자와 문자열만 받는다. Number(false)가 0이라 타입을 보지 않으면 불리언이
+  // 통과하는데, 출결 기준이 0으로 저장되면 아무도 보지 않아도 전원 출석이 된다.
+  // 이 함수가 막으려는 120%와 같은 종류의 조용한 실패다.
+  if (typeof value !== 'number' && typeof value !== 'string') return false;
   if (String(value).trim() === '') return false;
   var num = Number(value);
   return !isNaN(num) && num >= 0 && num <= 100;
@@ -84,7 +87,12 @@ function isValidDateRange(start, end) {
   return from <= to;
 }
 
-/** 기존 차시 목록에서 다음 순서 번호를 구한다. 값이 깨진 항목은 건너뛴다. */
+/**
+ * 기존 차시 목록에서 다음 순서 번호를 구한다.
+ * 정확히는 "가장 큰 순서 다음, 최소 1"이다. 누적값이 0에서 시작하므로
+ * 순서가 전부 음수인 경우에도 1을 돌려준다. 음수 순서는 사람이 시트를
+ * 직접 고쳐야만 생기고, 그때 돌려주는 1도 기존 값과 충돌하지 않는다.
+ */
 function nextLessonOrder(lessons) {
   var max = 0;
   for (var i = 0; i < lessons.length; i++) {
