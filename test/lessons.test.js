@@ -158,3 +158,48 @@ test('없는 차시를 지우려 하면 거부한다', () => {
   assert.throws(() => lessons.handleLessonDelete({ lesson_id: 'L-NOPE' }, ADMIN), /차시를 찾을 수 없습니다/);
   assert.throws(() => lessons.handleLessonDelete({}, ADMIN), /차시를 지정/);
 });
+
+test('순서를 숫자가 아닌 값으로 바꾸려 하면 조용히 무시하지 않고 거부한다', () => {
+  fresh();
+  const created = lessons.handleLessonUpsert(lessonPayload(), ADMIN);
+  const id = created.lesson.lesson_id;
+
+  ['삼', 'abc', 0, -1].forEach((bad) => {
+    assert.throws(
+      () => lessons.handleLessonUpsert(lessonPayload({ lesson_id: id, lesson_order: bad }), ADMIN),
+      /차시 순서는 1 이상/,
+      `막아야 함: ${bad}`
+    );
+  });
+
+  assert.strictEqual(sheet.findByPk('Lessons', id).lesson_order, 1, '거부했으면 원래 순서가 남아야 한다');
+});
+
+test('순서를 생략하면 기존 값을 그대로 둔다', () => {
+  fresh();
+  lessons.handleLessonUpsert(lessonPayload({ title: '1차시' }), ADMIN);
+  const second = lessons.handleLessonUpsert(lessonPayload({ title: '2차시' }), ADMIN);
+
+  lessons.handleLessonUpsert(lessonPayload({ lesson_id: second.lesson.lesson_id, title: '제목만 변경' }), ADMIN);
+
+  assert.strictEqual(sheet.findByPk('Lessons', second.lesson.lesson_id).lesson_order, 2);
+});
+
+test('순서가 겹치면 lesson_id 순으로 안정적으로 정렬한다', () => {
+  fresh();
+  // 순서 중복은 설계상 허용된다. 3번과 5번을 맞바꾸려면 중간에 같은 번호가 생긴다.
+  sheet.insert('Lessons', { lesson_id: 'L-BBB', class_id: 'C1', lesson_order: 1, title: '나중', video_url: 'https://x/b.mp4', video_duration_sec: 60 });
+  sheet.insert('Lessons', { lesson_id: 'L-AAA', class_id: 'C1', lesson_order: 1, title: '먼저', video_url: 'https://x/a.mp4', video_duration_sec: 60 });
+
+  assert.deepStrictEqual(lessons.lessonsOfClass_('C1').map((l) => l.title), ['먼저', '나중']);
+});
+
+test('순서 값이 비어 있는 차시는 맨 앞으로 오되 순서가 흔들리지 않는다', () => {
+  fresh();
+  sheet.insert('Lessons', { lesson_id: 'L-1', class_id: 'C1', lesson_order: 2, title: '둘째', video_url: 'https://x/1.mp4', video_duration_sec: 60 });
+  sheet.insert('Lessons', { lesson_id: 'L-2', class_id: 'C1', lesson_order: '', title: '순서없음', video_url: 'https://x/2.mp4', video_duration_sec: 60 });
+
+  const titles = lessons.lessonsOfClass_('C1').map((l) => l.title);
+  assert.deepStrictEqual(titles, ['순서없음', '둘째']);
+  assert.deepStrictEqual(lessons.lessonsOfClass_('C1').map((l) => l.title), titles, '반복 호출해도 같아야 한다');
+});

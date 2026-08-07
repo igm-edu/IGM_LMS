@@ -70,7 +70,13 @@ function handleLessonUpsert(payload, user) {
     var order = existing.lesson_order;
     if (payload.lesson_order !== undefined && String(payload.lesson_order).trim() !== '') {
       var requested = Number(payload.lesson_order);
-      if (!isNaN(requested)) order = requested;
+      // 순서를 바꾸려 했는데 값이 이상하면 조용히 무시하지 않고 알린다.
+      // 무시하면 관리자에게는 저장 성공으로 보이는데 순서는 그대로다.
+      // 중복은 일부러 허용한다. 3번과 5번을 맞바꾸려면 중간에 같은 번호가 잠시 생긴다.
+      if (isNaN(requested) || requested < 1) {
+        throw appError_('BAD_REQUEST', '차시 순서는 1 이상의 숫자여야 합니다.');
+      }
+      order = requested;
     }
 
     return { lesson: update('Lessons', lessonId, {
