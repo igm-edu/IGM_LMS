@@ -187,6 +187,9 @@ function nextLessonOrder(lessons) {
 Run: `npm test`
 Expected: 159 tests pass (기존 150 + 신규 9)
 
+**주의: 이 태스크는 리뷰 후 수정으로 테스트 2개가 더 붙어 161개로 끝났다(b5dbe74).
+아래 태스크들의 예상 개수는 그 2개를 반영한 값이다.**
+
 - [ ] **Step 5: 커밋**
 
 ```bash
@@ -532,7 +535,7 @@ if (typeof module !== 'undefined') {
 - [ ] **Step 4: 테스트 실행해 통과 확인**
 
 Run: `npm test`
-Expected: 171 tests pass (159 + 신규 12)
+Expected: 173 tests pass (161 + 신규 12)
 
 - [ ] **Step 5: 커밋**
 
@@ -867,7 +870,7 @@ if (typeof module !== 'undefined') {
 - [ ] **Step 4: 테스트 실행해 통과 확인**
 
 Run: `npm test`
-Expected: 185 tests pass (171 + 신규 14)
+Expected: 187 tests pass (173 + 신규 14)
 
 - [ ] **Step 5: 커밋**
 
@@ -1042,7 +1045,7 @@ var ADMIN_ONLY = ['admin'];
 - [ ] **Step 4: 테스트 실행해 통과 확인**
 
 Run: `npm test`
-Expected: 191 tests pass (185 + 신규 6)
+Expected: 193 tests pass (187 + 신규 6)
 
 - [ ] **Step 5: 권한 분기가 실제로 동작하는지 변이 검증**
 
@@ -1057,7 +1060,7 @@ Expected: 191 tests pass (185 + 신규 6)
 Run: `npm test`
 Expected: `학생 토큰으로는 관리자 전용 action이 거부된다`가 실패한다.
 
-원래대로 되돌리고 다시 `npm test`로 191개 통과를 확인한다. 실패하지 않았다면 테스트가 제 역할을 못 하는 것이므로 멈추고 보고할 것.
+원래대로 되돌리고 다시 `npm test`로 193개 통과를 확인한다. 실패하지 않았다면 테스트가 제 역할을 못 하는 것이므로 멈추고 보고할 것.
 
 - [ ] **Step 6: 커밋**
 
@@ -1077,7 +1080,7 @@ roles: ['admin']이 처음 들어가면서 지금까지 실행된 적 없던 역
 
 ## 완료 기준
 
-- `npm test`가 191개 테스트를 통과하고 출력이 깨끗하다.
+- `npm test`가 193개 테스트를 통과하고 출력이 깨끗하다.
 - 학생 토큰으로 관리자 전용 action을 부르면 `FORBIDDEN`, 관리자 토큰으로는 통과한다.
 - 역할 비교를 무력화하면 그 테스트가 실제로 실패한다(Step 5에서 확인).
 - 없는 `class_id`나 `lesson_id`로 수정을 시도하면 새로 만들지 않고 거부한다.
