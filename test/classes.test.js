@@ -153,3 +153,52 @@ test('없는 클래스를 조회하면 거부한다', () => {
   assert.throws(() => classes.handleClassGet({ class_id: 'C-NOPE' }, ADMIN), /찾을 수 없/);
   assert.throws(() => classes.handleClassGet({}, ADMIN), /클래스를 지정/);
 });
+
+test('일부 항목만 보낸 편집은 나머지를 지우지 않는다', () => {
+  fresh();
+  const created = classes.handleClassUpsert(classPayload({
+    instructor_id: 'U-INS',
+    start_date: '2026-03-01',
+    end_date: '2026-03-31',
+    quiz_retry_allowed: true,
+    status: '진행중',
+  }), ADMIN);
+  const id = created.class.class_id;
+
+  // 이름만 고치는 요청. 나머지 항목은 아예 담기지 않는다.
+  classes.handleClassUpsert({
+    class_id: id,
+    class_name: '고친 이름',
+    batch: '1기',
+    watch_rate_threshold: 80,
+    quiz_pass_score: 60,
+  }, ADMIN);
+
+  const row = sheet.findByPk('Classes', id);
+  assert.strictEqual(row.class_name, '고친 이름');
+  assert.strictEqual(row.instructor_id, 'U-INS', '담당 강사가 지워졌다');
+  assert.strictEqual(String(row.start_date), '2026-03-01', '시작일이 지워졌다');
+  assert.strictEqual(String(row.end_date), '2026-03-31', '종료일이 지워졌다');
+  assert.strictEqual(row.quiz_retry_allowed, true, '재응시 설정이 꺼졌다');
+  assert.strictEqual(row.status, '진행중', '상태가 모집중으로 되돌아갔다');
+});
+
+test('명시적으로 보낸 빈 값은 실제로 비운다', () => {
+  fresh();
+  const created = classes.handleClassUpsert(classPayload({ instructor_id: 'U-INS' }), ADMIN);
+  const id = created.class.class_id;
+
+  classes.handleClassUpsert(classPayload({ class_id: id, instructor_id: '' }), ADMIN);
+
+  assert.strictEqual(sheet.findByPk('Classes', id).instructor_id, '', '보낸 빈 값은 반영되어야 한다');
+});
+
+test('신규 생성에서 선택 항목을 생략하면 기본값이 채워진다', () => {
+  fresh();
+  const created = classes.handleClassUpsert(classPayload(), ADMIN);
+  const row = sheet.findByPk('Classes', created.class.class_id);
+
+  assert.strictEqual(row.status, '모집중');
+  assert.strictEqual(row.instructor_id, '');
+  assert.strictEqual(row.quiz_retry_allowed, false);
+});

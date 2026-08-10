@@ -51,10 +51,14 @@ function handleClassUpsert(payload, user) {
     throw appError_('BAD_REQUEST', '필수 항목이 비어 있습니다: ' + missing.join(', '));
   }
 
-  var status = payload.status === undefined || String(payload.status).trim() === ''
-    ? '모집중' : String(payload.status).trim();
-  if (!isValidClassStatus(status)) {
-    throw appError_('BAD_REQUEST', '클래스 상태는 모집중, 진행중, 종료 중 하나여야 합니다.');
+  // 상태는 보냈을 때만 검증하고 반영한다. 생략을 "모집중"으로 해석하면
+  // 이름만 고치려던 편집이 진행중 클래스를 모집중으로 되돌린다.
+  var status = null;
+  if (payload.status !== undefined && String(payload.status).trim() !== '') {
+    status = String(payload.status).trim();
+    if (!isValidClassStatus(status)) {
+      throw appError_('BAD_REQUEST', '클래스 상태는 모집중, 진행중, 종료 중 하나여야 합니다.');
+    }
   }
 
   if (!isPercentInRange(payload.watch_rate_threshold)) {
@@ -82,17 +86,23 @@ function handleClassUpsert(payload, user) {
     }
   }
 
+  // 필수 항목은 항상 반영한다. 빠지면 위 검증에서 이미 걸러졌다.
   var record = {
     class_name: String(payload.class_name).trim(),
     batch: String(payload.batch).trim(),
-    instructor_id: instructorId,
-    start_date: payload.start_date || '',
-    end_date: payload.end_date || '',
     watch_rate_threshold: Number(payload.watch_rate_threshold),
     quiz_pass_score: Number(payload.quiz_pass_score),
-    quiz_retry_allowed: payload.quiz_retry_allowed === true,
-    status: status,
   };
+
+  // 선택 항목은 요청에 담겼을 때만 반영한다. 없는 것을 기본값으로 덮어쓰면
+  // 이름만 고치려던 편집이 담당 강사와 운영 기간을 조용히 지운다.
+  if (payload.instructor_id !== undefined) record.instructor_id = instructorId;
+  if (payload.start_date !== undefined) record.start_date = payload.start_date || '';
+  if (payload.end_date !== undefined) record.end_date = payload.end_date || '';
+  if (payload.quiz_retry_allowed !== undefined) {
+    record.quiz_retry_allowed = payload.quiz_retry_allowed === true;
+  }
+  if (status !== null) record.status = status;
 
   var classId = payload.class_id === undefined || payload.class_id === null
     ? '' : String(payload.class_id).trim();
@@ -102,8 +112,16 @@ function handleClassUpsert(payload, user) {
     if (!findByPk('Classes', classId)) {
       throw appError_('BAD_REQUEST', '수정할 클래스를 찾을 수 없습니다.');
     }
+    // update는 patch에 담긴 열만 바꾸므로 보내지 않은 항목은 그대로 남는다.
     return { class: update('Classes', classId, record) };
   }
+
+  // 신규 생성에서는 빠진 선택 항목을 기본값으로 채운다.
+  if (record.instructor_id === undefined) record.instructor_id = '';
+  if (record.start_date === undefined) record.start_date = '';
+  if (record.end_date === undefined) record.end_date = '';
+  if (record.quiz_retry_allowed === undefined) record.quiz_retry_allowed = false;
+  if (record.status === undefined) record.status = '모집중';
 
   record.class_id = newId('C');
   insert('Classes', record);
