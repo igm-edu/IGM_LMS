@@ -9,6 +9,13 @@
 var PUBLIC = 'PUBLIC';
 var ANY_USER = 'ANY_USER';
 
+/**
+ * 관리자 전용. 반드시 배열이어야 한다. 문자열로 적으면 String.indexOf가
+ * 부분 문자열을 찾아 조용히 통과시킨다(main.js의 배열 검사가 막아주지만
+ * 애초에 배열로 적는다).
+ */
+var ADMIN_ONLY = ['admin'];
+
 var routesCache_ = null;
 
 /**
@@ -25,6 +32,11 @@ function routes_() {
       'auth.logout':        { handler: handleLogout,        roles: ANY_USER },
       'auth.me':            { handler: handleMe,            roles: ANY_USER },
       'auth.updateProfile': { handler: handleUpdateProfile, roles: ANY_USER },
+      'class.list':    { handler: handleClassList,    roles: ANY_USER },
+      'class.get':     { handler: handleClassGet,     roles: ANY_USER },
+      'class.upsert':  { handler: handleClassUpsert,  roles: ADMIN_ONLY },
+      'lesson.upsert': { handler: handleLessonUpsert, roles: ADMIN_ONLY },
+      'lesson.delete': { handler: handleLessonDelete, roles: ADMIN_ONLY },
     };
   }
   return routesCache_;
@@ -135,6 +147,15 @@ if (typeof module !== 'undefined') {
   global.handleLogout = authHandlers.handleLogout;
   global.handleMe = authHandlers.handleMe;
   global.handleUpdateProfile = authHandlers.handleUpdateProfile;
+
+  var classHandlers = require('./handlers/classes');
+  global.handleClassList = classHandlers.handleClassList;
+  global.handleClassGet = classHandlers.handleClassGet;
+  global.handleClassUpsert = classHandlers.handleClassUpsert;
+
+  var lessonHandlers = require('./handlers/lessons');
+  global.handleLessonUpsert = lessonHandlers.handleLessonUpsert;
+  global.handleLessonDelete = lessonHandlers.handleLessonDelete;
 
   module.exports = {
     PUBLIC: PUBLIC,
