@@ -71,7 +71,13 @@ test('라우팅 표의 PUBLIC이 아닌 모든 action이 토큰을 요구한다'
   fresh();
   const routes = main.routes_();
   const guarded = Object.keys(routes).filter((action) => routes[action].roles !== main.PUBLIC);
-  assert.ok(guarded.length >= 3, '보호되는 action이 있어야 이 검사가 의미를 가진다');
+  // 보호 대상 action의 이름을 명시적으로 고정한다. 개수 임계값에 의존하면
+  // 새 action을 추가하면서 하나를 실수로 PUBLIC으로 두어도 조용히 통과한다.
+  assert.deepStrictEqual(guarded.sort(), [
+    'auth.logout', 'auth.me', 'auth.updateProfile',
+    'class.get', 'class.list', 'class.upsert',
+    'lesson.delete', 'lesson.upsert',
+  ].sort(), '보호 대상 action 목록이 바뀌었다. 새 action의 roles를 확인할 것');
 
   guarded.forEach((action) => {
     const response = post(action, {});
@@ -196,4 +202,92 @@ test('doGet은 상태만 알려주고 데이터를 다루지 않는다', () => {
   const response = JSON.parse(main.doGet().getContent());
   assert.strictEqual(response.ok, true);
   assert.strictEqual(JSON.stringify(response).indexOf('password'), -1);
+});
+
+// 관리자 계정을 만들고 토큰을 얻는다. seedAdmin은 스크립트 속성을 쓰므로
+// 여기서는 가입시킨 뒤 역할만 바꾸는 편이 간단하다.
+// 다시 로그인할 필요는 없다. verifySession이 요청마다 Users 행을 새로 읽으므로
+// 역할 변경이 기존 토큰에도 바로 반영된다.
+function adminToken() {
+  const signup = post('auth.signup', SIGNUP);
+  sheet.update('Users', signup.data.user.user_id, { role: 'admin' });
+  return signup.data.token;
+}
+
+function studentToken() {
+  const payload = Object.assign({}, SIGNUP, { email: 'student@igm.co.kr' });
+  return post('auth.signup', payload).data.token;
+}
+
+test('학생 토큰으로는 관리자 전용 action이 거부된다', () => {
+  fresh();
+  const token = studentToken();
+
+  ['class.upsert', 'lesson.upsert', 'lesson.delete'].forEach((action) => {
+    const response = post(action, {}, token);
+    assert.strictEqual(response.ok, false, `${action}이 학생에게 통과했다`);
+    assert.strictEqual(response.error.code, 'FORBIDDEN', `${action}의 오류 코드가 다르다`);
+  });
+});
+
+test('관리자 토큰으로는 관리자 전용 action이 통과한다', () => {
+  fresh();
+  const token = adminToken();
+
+  const created = post('class.upsert', {
+    class_name: '리더십', batch: '1기', watch_rate_threshold: 80, quiz_pass_score: 60,
+  }, token);
+
+  assert.strictEqual(created.ok, true);
+  assert.strictEqual(created.data.class.status, '모집중');
+});
+
+test('회원이면 누구나 클래스 목록과 상세를 볼 수 있다', () => {
+  fresh();
+  const admin = adminToken();
+  const created = post('class.upsert', {
+    class_name: '리더십', batch: '1기', watch_rate_threshold: 80, quiz_pass_score: 60,
+  }, admin).data.class;
+
+  const student = studentToken();
+  const list = post('class.list', {}, student);
+  const detail = post('class.get', { class_id: created.class_id }, student);
+
+  assert.strictEqual(list.ok, true);
+  assert.strictEqual(list.data.classes.length, 1);
+  assert.strictEqual(detail.ok, true);
+  assert.strictEqual(detail.data.class.class_id, created.class_id);
+});
+
+test('토큰 없이는 클래스 목록도 볼 수 없다', () => {
+  fresh();
+  const response = post('class.list', {});
+  assert.strictEqual(response.ok, false);
+  assert.strictEqual(response.error.code, 'TOKEN_INVALID');
+});
+
+test('차시 등록과 삭제가 라우팅을 통해 동작한다', () => {
+  fresh();
+  const token = adminToken();
+  const cls = post('class.upsert', {
+    class_name: '리더십', batch: '1기', watch_rate_threshold: 80, quiz_pass_score: 60,
+  }, token).data.class;
+
+  const lesson = post('lesson.upsert', {
+    class_id: cls.class_id, title: '1차시',
+    video_url: 'https://cdn.example.com/1.mp4', video_duration_sec: 1800,
+  }, token);
+  assert.strictEqual(lesson.ok, true);
+  assert.strictEqual(lesson.data.lesson.lesson_order, 1);
+
+  const removed = post('lesson.delete', { lesson_id: lesson.data.lesson.lesson_id }, token);
+  assert.strictEqual(removed.ok, true);
+});
+
+test('관리자 전용 라우트의 roles는 배열로 선언되어 있다', () => {
+  const routes = main.routes_();
+  ['class.upsert', 'lesson.upsert', 'lesson.delete'].forEach((action) => {
+    assert.ok(Array.isArray(routes[action].roles), `${action}의 roles가 배열이 아니다`);
+    assert.deepStrictEqual(routes[action].roles, ['admin']);
+  });
 });
