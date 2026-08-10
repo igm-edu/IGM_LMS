@@ -2,7 +2,12 @@
  * 차시 핸들러. 라우팅과 권한 검사는 main.js가 하고 여기서는 내용만 다룬다.
  */
 
+// 신규 등록에는 전부 필요하다.
 var LESSON_REQUIRED_FIELDS = ['class_id', 'title', 'video_url', 'video_duration_sec'];
+
+// 수정에는 대상 클래스만 필요하다. 나머지는 보냈을 때만 반영한다.
+// 제목 오타 하나를 고치려고 영상 주소와 길이를 다시 보내게 하지 않기 위해서다.
+var LESSON_EDIT_REQUIRED_FIELDS = ['class_id'];
 
 /** 한 클래스의 차시를 순서대로 돌려준다. 순서가 같으면 lesson_id로 안정 정렬한다. */
 function lessonsOfClass_(classId) {
@@ -33,8 +38,18 @@ function watcherCount_(lessonId) {
   return count;
 }
 
+function hasValue_(payload, field) {
+  return payload[field] !== undefined
+    && payload[field] !== null
+    && String(payload[field]).trim() !== '';
+}
+
 function handleLessonUpsert(payload, user) {
-  var missing = requireFields(payload, LESSON_REQUIRED_FIELDS);
+  var lessonId = payload.lesson_id === undefined || payload.lesson_id === null
+    ? '' : String(payload.lesson_id).trim();
+
+  var missing = requireFields(payload,
+    lessonId ? LESSON_EDIT_REQUIRED_FIELDS : LESSON_REQUIRED_FIELDS);
   if (missing.length) {
     throw appError_('BAD_REQUEST', '필수 항목이 비어 있습니다: ' + missing.join(', '));
   }
@@ -44,18 +59,29 @@ function handleLessonUpsert(payload, user) {
     throw appError_('BAD_REQUEST', '클래스를 찾을 수 없습니다.');
   }
 
-  if (!isHttpsUrl(payload.video_url)) {
+  var hasUrl = hasValue_(payload, 'video_url');
+  var hasDuration = hasValue_(payload, 'video_duration_sec');
+
+  // 영상 주소를 바꾸면 길이도 함께 와야 한다. 주소만 갈면 이전 영상의 길이가
+  // 그대로 남아 시청률 분모가 틀어지고, 오류 없이 잘못된 수료 판정으로만 드러난다.
+  if (hasUrl && !hasDuration) {
+    throw appError_('BAD_REQUEST',
+      '영상 주소를 바꿀 때는 영상 길이도 함께 보내야 합니다. ' +
+      '길이가 이전 영상 값으로 남으면 시청률 계산이 어긋납니다.');
+  }
+
+  if (hasUrl && !isHttpsUrl(payload.video_url)) {
     throw appError_('BAD_REQUEST',
       '영상 주소는 https로 시작해야 합니다. 사이트가 HTTPS라 http 영상은 브라우저가 차단합니다.');
   }
 
-  var duration = Number(payload.video_duration_sec);
-  if (isNaN(duration) || duration <= 0) {
-    throw appError_('BAD_REQUEST', '영상 길이는 0보다 큰 값이어야 합니다.');
+  var duration = null;
+  if (hasDuration) {
+    duration = Number(payload.video_duration_sec);
+    if (isNaN(duration) || duration <= 0) {
+      throw appError_('BAD_REQUEST', '영상 길이는 0보다 큰 값이어야 합니다.');
+    }
   }
-
-  var lessonId = payload.lesson_id === undefined || payload.lesson_id === null
-    ? '' : String(payload.lesson_id).trim();
 
   if (lessonId) {
     var existing = findByPk('Lessons', lessonId);
@@ -79,12 +105,20 @@ function handleLessonUpsert(payload, user) {
       order = requested;
     }
 
-    return { lesson: update('Lessons', lessonId, {
-      title: String(payload.title).trim(),
-      video_url: String(payload.video_url).trim(),
-      video_duration_sec: duration,
-      lesson_order: order,
-    }) };
+    // 보낸 항목만 반영한다. 빠진 항목을 덮어쓰면 제목만 고치려던 요청이
+    // 영상 주소와 길이를 지운다. 설계 4.1절이 정한 규칙이다.
+    var patch = { lesson_order: order };
+
+    if (payload.title !== undefined) {
+      if (String(payload.title).trim() === '') {
+        throw appError_('BAD_REQUEST', '차시 제목은 비울 수 없습니다.');
+      }
+      patch.title = String(payload.title).trim();
+    }
+    if (hasUrl) patch.video_url = String(payload.video_url).trim();
+    if (hasDuration) patch.video_duration_sec = duration;
+
+    return { lesson: update('Lessons', lessonId, patch) };
   }
 
   var record = {

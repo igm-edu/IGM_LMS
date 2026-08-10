@@ -203,3 +203,68 @@ test('순서 값이 비어 있는 차시는 맨 앞으로 오되 순서가 흔�
   assert.deepStrictEqual(titles, ['순서없음', '둘째']);
   assert.deepStrictEqual(lessons.lessonsOfClass_('C1').map((l) => l.title), titles, '반복 호출해도 같아야 한다');
 });
+
+test('제목만 보내는 수정이 영상 주소와 길이를 지우지 않는다', () => {
+  fresh();
+  const created = lessons.handleLessonUpsert(lessonPayload(), ADMIN);
+  const id = created.lesson.lesson_id;
+
+  lessons.handleLessonUpsert({ lesson_id: id, class_id: 'C1', title: '고친 제목' }, ADMIN);
+
+  const row = sheet.findByPk('Lessons', id);
+  assert.strictEqual(row.title, '고친 제목');
+  assert.strictEqual(row.video_url, 'https://cdn.example.com/1.mp4', '영상 주소가 지워졌다');
+  assert.strictEqual(row.video_duration_sec, 1800, '영상 길이가 지워졌다');
+});
+
+test('영상 주소를 바꿀 때는 길이도 함께 보내야 한다', () => {
+  fresh();
+  const created = lessons.handleLessonUpsert(lessonPayload(), ADMIN);
+  const id = created.lesson.lesson_id;
+
+  // 길이 없이 주소만 바꾸면 이전 영상의 길이가 남아 시청률 분모가 틀어진다.
+  assert.throws(
+    () => lessons.handleLessonUpsert(
+      { lesson_id: id, class_id: 'C1', video_url: 'https://cdn.example.com/new.mp4' }, ADMIN),
+    /영상 길이도 함께/
+  );
+  assert.strictEqual(sheet.findByPk('Lessons', id).video_url, 'https://cdn.example.com/1.mp4');
+
+  // 함께 보내면 통과한다.
+  lessons.handleLessonUpsert(
+    { lesson_id: id, class_id: 'C1', video_url: 'https://cdn.example.com/new.mp4', video_duration_sec: 600 }, ADMIN);
+  const row = sheet.findByPk('Lessons', id);
+  assert.strictEqual(row.video_url, 'https://cdn.example.com/new.mp4');
+  assert.strictEqual(row.video_duration_sec, 600);
+});
+
+test('길이만 고치는 것은 허용한다', () => {
+  fresh();
+  const created = lessons.handleLessonUpsert(lessonPayload(), ADMIN);
+  const id = created.lesson.lesson_id;
+
+  // 자동 측정이 틀렸을 때 손으로 바로잡는 경로다.
+  lessons.handleLessonUpsert({ lesson_id: id, class_id: 'C1', video_duration_sec: 1795 }, ADMIN);
+
+  assert.strictEqual(sheet.findByPk('Lessons', id).video_duration_sec, 1795);
+});
+
+test('제목을 비우려는 수정은 거부한다', () => {
+  fresh();
+  const created = lessons.handleLessonUpsert(lessonPayload(), ADMIN);
+  const id = created.lesson.lesson_id;
+
+  assert.throws(
+    () => lessons.handleLessonUpsert({ lesson_id: id, class_id: 'C1', title: '  ' }, ADMIN),
+    /제목은 비울 수 없습니다/
+  );
+  assert.strictEqual(sheet.findByPk('Lessons', id).title, '1차시 오리엔테이션');
+});
+
+test('신규 등록에는 여전히 영상 주소와 길이가 필요하다', () => {
+  fresh();
+  assert.throws(
+    () => lessons.handleLessonUpsert({ class_id: 'C1', title: '주소 없는 차시' }, ADMIN),
+    /video_url/
+  );
+});
