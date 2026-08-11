@@ -119,12 +119,16 @@ function findBy(name, field, value) {
 }
 
 /**
- * 기본키가 아닌 열로 레코드를 찾는다.
+ * 기본키가 아닌 열로 일치하는 레코드를 전부 찾는다.
  * readAll이 시트 전체를 읽는 것과 달리 해당 열 하나만 훑어 행 번호를 찾고
- * 그 행만 다시 읽는다. 호출은 두 번이지만 각 payload가 훨씬 작다.
- * 일치하는 행이 여럿이면 가장 위의 행을 돌려준다.
+ * 일치한 행만 다시 읽는다. 호출은 여러 번이지만 각 payload가 훨씬 작다.
+ *
+ * normalizer를 넘기면 찾는 값과 시트 셀 양쪽에 적용한 뒤 비교한다.
+ * 한쪽에만 적용하면 관리자가 시트를 손으로 편집한 행이 조회되지 않는다.
+ * 이메일 조회가 바로 그런 경우다 — 저장 경로만 소문자로 맞춰봐야
+ * 사람이 대문자로 적어 넣은 행은 영영 찾지 못한다.
  */
-function findByColumn(name, field, value) {
+function findAllByColumn(name, field, value, normalizer) {
   var headers = headersOf_(name);
   var columnIndex = headers.indexOf(field);
   if (columnIndex === -1) {
@@ -133,17 +137,25 @@ function findByColumn(name, field, value) {
 
   var sheet = getSheet_(name);
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return null;
+  if (lastRow < 2) return [];
 
   var column = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getValues();
-  var target = String(value);
+  var target = normalizer ? String(normalizer(value)) : String(value);
+  var out = [];
   for (var i = 0; i < column.length; i++) {
-    if (String(column[i][0]) === target) {
+    var cell = normalizer ? String(normalizer(column[i][0])) : String(column[i][0]);
+    if (cell === target) {
       var row = sheet.getRange(i + 2, 1, 1, headers.length).getValues()[0];
-      return rowToObject_(headers, row);
+      out.push(rowToObject_(headers, row));
     }
   }
-  return null;
+  return out;
+}
+
+/** findAllByColumn과 같되 가장 위의 한 행만 돌려준다. 없으면 null. */
+function findByColumn(name, field, value, normalizer) {
+  var rows = findAllByColumn(name, field, value, normalizer);
+  return rows.length ? rows[0] : null;
 }
 
 function insert(name, obj) {
@@ -204,6 +216,7 @@ if (typeof module !== 'undefined') {
     findByPk: findByPk,
     findBy: findBy,
     findByColumn: findByColumn,
+    findAllByColumn: findAllByColumn,
     insert: insert,
     update: update,
     upsert: upsert,

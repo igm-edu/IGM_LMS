@@ -62,7 +62,9 @@ function handleSignup(payload) {
   var user;
   try {
     // 확인과 저장 사이에 다른 요청이 끼어들면 같은 이메일로 계정이 둘 생긴다.
-    if (findByColumn('Users', 'email', email)) {
+    // 시트 값도 정규화해서 본다. 그러지 않으면 사람이 손으로 넣은 Kim@IGM.co.kr을
+    // kim@igm.co.kr 가입이 중복으로 잡지 못해 한 사람에게 행이 둘 생긴다.
+    if (findByColumn('Users', 'email', email, normalizeEmail)) {
       throw appError_('EMAIL_TAKEN', '이미 가입된 이메일입니다.');
     }
     user = {
@@ -103,22 +105,35 @@ function handleLogin(payload) {
     throw appError_('ACCOUNT_LOCKED', '로그인 시도가 많아 잠시 잠겼습니다. 10분 후 다시 시도해 주세요.');
   }
 
-  var user = findByColumn('Users', 'email', email);
-  var matched = false;
-  if (user) {
+  // 같은 이메일 행이 둘 이상일 수 있다. 중복 검사가 정규화 없이 돌던 시절에
+  // 만들어진 행들이다. 첫 행만 보면 나머지 사람은 비밀번호가 맞아도 영영
+  // 로그인하지 못하므로, 일치하는 행을 모두 시도한다.
+  var candidates = findAllByColumn('Users', 'email', email, normalizeEmail);
+  if (candidates.length > 1) {
+    // 관리자가 찾아서 정리해야 할 상태다. 로그인 자체는 막지 않고 기록만 남긴다.
+    logError_('auth.login', '', new Error(
+      '같은 이메일의 사용자 행이 ' + candidates.length + '개입니다: ' + email
+    ));
+  }
+
+  var user = null;
+  for (var i = 0; i < candidates.length; i++) {
+    var candidate = candidates[i];
     try {
-      matched = verifyPassword(password, user.password_hash);
+      if (verifyPassword(password, candidate.password_hash)) {
+        user = candidate;
+        break;
+      }
     } catch (err) {
       // 저장값이 손상되어도 로그인 기능 전체가 죽어서는 안 된다.
-      // 그 계정만 실패시키고 원인 파악을 위해 기록은 남긴다.
-      logError_('auth.login', user.user_id, err);
-      matched = false;
+      // 그 계정만 건너뛰고 원인 파악을 위해 기록은 남긴다.
+      logError_('auth.login', candidate.user_id, err);
     }
   }
 
   // 이메일이 없는 경우와 비밀번호가 틀린 경우를 구분해 알려주면
   // 어떤 이메일이 가입돼 있는지 확인하는 수단이 된다. 같은 응답을 준다.
-  if (!user || !matched) {
+  if (!user) {
     recordFailure(email);
     throw appError_('INVALID_CREDENTIALS', '이메일 또는 비밀번호가 올바르지 않습니다.');
   }
@@ -185,6 +200,7 @@ if (typeof module !== 'undefined') {
   global.validatePassword = validateLib.validatePassword;
   global.requireFields = validateLib.requireFields;
   global.findByColumn = sheetLib.findByColumn;
+  global.findAllByColumn = sheetLib.findAllByColumn;
   global.insert = sheetLib.insert;
   global.newId = sheetLib.newId;
   global.hashPassword = require('../lib/hash').hashPassword;

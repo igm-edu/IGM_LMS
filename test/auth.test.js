@@ -223,6 +223,94 @@ test('저장된 해시가 손상되어도 그 계정만 실패하고 예외가 �
   });
 });
 
+// 시트는 관리자가 손으로 편집한다. 아래 네 가지는 그렇게 만들어진 행이
+// 로그인·중복검사에서 어떻게 취급되는지를 고정한다.
+
+test('시트에 대문자로 저장된 이메일도 로그인된다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  sheet.update('Users', created.user.user_id, { email: 'Park@IGM.co.kr' });
+
+  assert.ok(auth.handleLogin({ email: 'park@igm.co.kr', password: 'abcd1234' }).token);
+});
+
+test('시트에 앞뒤 공백이 있는 이메일도 로그인된다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  sheet.update('Users', created.user.user_id, { email: '  lee@igm.co.kr  ' });
+
+  assert.ok(auth.handleLogin({ email: 'lee@igm.co.kr', password: 'abcd1234' }).token);
+});
+
+test('시트에 대문자로 적힌 이메일도 가입 중복으로 잡는다', () => {
+  fresh();
+  const created = auth.handleSignup(signupPayload());
+  sheet.update('Users', created.user.user_id, { email: 'Kim@IGM.co.kr' });
+
+  assert.throws(() => auth.handleSignup(signupPayload({ email: 'kim@igm.co.kr' })), (err) => {
+    assert.strictEqual(err.appCode, 'EMAIL_TAKEN');
+    return true;
+  });
+  assert.strictEqual(sheet.readAll('Users').length, 1);
+});
+
+/** 정규화 없이 중복 검사가 돌던 시절에 생긴 "한 이메일에 두 행" 상태를 만든다. */
+function seedDuplicateEmailRows() {
+  const first = auth.handleSignup(signupPayload({ email: 'dup@igm.co.kr', password: 'first1234' }));
+  const second = auth.handleSignup(signupPayload({ email: 'other@igm.co.kr', password: 'second1234' }));
+  sheet.update('Users', second.user.user_id, { email: 'Dup@IGM.co.kr' });
+  return { first, second };
+}
+
+test('같은 이메일 행이 둘이면 각자의 비밀번호로 둘 다 로그인된다', () => {
+  fresh();
+  const { first, second } = seedDuplicateEmailRows();
+
+  assert.strictEqual(
+    auth.handleLogin({ email: 'dup@igm.co.kr', password: 'first1234' }).user.user_id,
+    first.user.user_id
+  );
+  // 첫 행만 보던 시절에는 이 사람이 영구히 잠겼다.
+  assert.strictEqual(
+    auth.handleLogin({ email: 'dup@igm.co.kr', password: 'second1234' }).user.user_id,
+    second.user.user_id
+  );
+});
+
+test('같은 이메일 행이 둘이면 관리자가 찾을 수 있게 기록을 남긴다', () => {
+  fresh();
+  seedDuplicateEmailRows();
+
+  const original = global.logError_;
+  const logged = [];
+  global.logError_ = function (action, userId, err) {
+    logged.push({ action: action, message: err && err.message });
+  };
+
+  try {
+    auth.handleLogin({ email: 'dup@igm.co.kr', password: 'first1234' });
+  } finally {
+    global.logError_ = original;
+  }
+
+  assert.strictEqual(logged.length, 1);
+  assert.strictEqual(logged[0].action, 'auth.login');
+  assert.match(logged[0].message, /2개/);
+  assert.match(logged[0].message, /dup@igm\.co\.kr/);
+});
+
+test('이름이 같고 이메일이 다르면 각자 로그인된다', () => {
+  fresh();
+  const emails = ['kim1@igm.co.kr', 'kim2@igm.co.kr', 'kim3@igm.co.kr'];
+  emails.forEach((email) => {
+    auth.handleSignup(signupPayload({ name: '김철수', email: email }));
+  });
+
+  emails.forEach((email) => {
+    assert.strictEqual(auth.handleLogin({ email: email, password: 'abcd1234' }).user.email, email);
+  });
+});
+
 test('이메일이나 비밀번호가 비면 BAD_REQUEST', () => {
   fresh();
   assert.throws(() => auth.handleLogin({ email: '', password: 'abcd1234' }), (err) => {

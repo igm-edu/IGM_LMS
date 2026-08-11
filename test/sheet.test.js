@@ -217,6 +217,28 @@ test('findByColumn은 값이 여럿이면 가장 위의 행을 돌려준다', ()
   assert.strictEqual(sheet.findByColumn('Users', 'email', 'same@b.com').name, '위');
 });
 
+const lower = (v) => String(v).trim().toLowerCase();
+
+test('findByColumn은 normalizer를 찾는 값과 시트 값 양쪽에 적용한다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', email: '  A@B.com ' });
+
+  // 한쪽에만 적용하면 사람이 손으로 넣은 이 행은 영영 찾지 못한다.
+  assert.strictEqual(sheet.findByColumn('Users', 'email', 'a@b.com'), null);
+  assert.strictEqual(sheet.findByColumn('Users', 'email', 'a@b.com', lower).user_id, 'U1');
+});
+
+test('findAllByColumn은 일치하는 행을 모두 돌려준다', () => {
+  freshSpreadsheet();
+  sheet.insert('Users', { user_id: 'U1', name: '위', email: 'same@b.com' });
+  sheet.insert('Users', { user_id: 'U2', name: '가운데', email: 'other@b.com' });
+  sheet.insert('Users', { user_id: 'U3', name: '아래', email: 'SAME@b.com' });
+
+  const found = sheet.findAllByColumn('Users', 'email', 'same@b.com', lower);
+  assert.deepStrictEqual(found.map((row) => row.user_id), ['U1', 'U3']);
+  assert.deepStrictEqual(sheet.findAllByColumn('Users', 'email', 'x@y.com', lower), []);
+});
+
 test('findByColumn은 정의되지 않은 열 이름을 거부한다', () => {
   freshSpreadsheet();
   assert.throws(() => sheet.findByColumn('Users', '없는열', 'x'), /정의되지 않은 열/);
