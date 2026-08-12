@@ -1,6 +1,10 @@
-// 웹앱 엔드포인트. 이 주소는 비밀이 아니다 — 유효한 토큰 없이는
-// 어떤 데이터도 반환하지 않는다.
+// Supabase 프로젝트 접속 정보.
 //
-// 코드를 고친 뒤에는 clasp push 만으로는 이 주소가 가리키는 버전이 바뀌지 않는다.
-// clasp create-deployment 로 새 배포를 만들고 이 값을 갱신해야 한다.
-export const API_URL = 'https://script.google.com/macros/s/AKfycby9vOaJnR0LnrNVwxx6JsTu7n1PihTaybAuw5oIJRIj9lff-Gw-cjBedlmC385pDpJBKQ/exec';
+// 두 값 모두 공개해도 되는 값이다. publishable 키는 브라우저에 실리는 것을
+// 전제로 만들어졌고, 접근 제어는 전적으로 RLS 정책이 담당한다.
+// (supabase/migrations/002_security.sql)
+//
+// secret 키(sb_secret_...)와 DB 비밀번호는 RLS를 전부 우회한다.
+// 이 저장소는 공개이므로 그 둘은 절대 여기에 두지 않는다.
+export const SUPABASE_URL = 'https://djaooyyyiwqaewyirdvq.supabase.co';
+export const SUPABASE_KEY = 'sb_publishable_hnDPiannz5bpdmr_Jb8eZg_InN07mDG';
