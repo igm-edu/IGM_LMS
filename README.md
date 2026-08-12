@@ -1,65 +1,84 @@
 # IGM_LMS
 
-IGM 공개과정 e러닝 LMS. GitHub Pages(프론트) + Google Apps Script(API) + Google Sheets(DB) 구성이다.
+IGM 공개과정 e러닝 LMS. GitHub Pages(프론트) + Supabase(인증·DB) 구성이다.
+영상은 기존 mp4 직링크 서버에 두고 이 시스템을 거치지 않는다.
+
+라이브: https://igm-edu.github.io/IGM_LMS/
 
 ## 문서
 
-- 설계: `docs/superpowers/specs/2026-08-05-lms-design.md`
-- 구현 계획: `docs/superpowers/plans/`
+- 설계: `docs/superpowers/specs/`
+- Supabase 이전 검토: `docs/superpowers/specs/2026-08-12-supabase-migration-review.md`
+- DB 설정과 실행 순서: `supabase/README.md`
+
+2026-08-12 이전에는 Google Apps Script + Google Sheets 였다. 그 시절의 설계
+문서는 `docs/` 에 그대로 두었다. 도메인 규칙은 지금도 유효하고, 어떤 판단을
+왜 했는지가 남아 있기 때문이다. 다만 **7장의 해싱 3,000회 같은 기술 제약은
+Apps Script 한도에서 나온 것이라 지금은 해당되지 않는다.**
+
+## 구조
+
+```
+assets/js/config.js   Supabase 주소와 공개 키
+assets/js/api.js      통신 계층. 세션 보관과 토큰 갱신
+assets/js/auth.js     가입·로그인·프로필
+assets/js/main.js     화면 전환과 폼 처리
+supabase/migrations/  스키마·RLS 정책·서버 함수 (SQL)
+test/                 Node 내장 러너
+```
+
+빌드 단계가 없다. `index.html` 을 열면 그대로 동작한다.
 
 ## 개발
-
-테스트는 저장소 루트에서 실행한다. 외부 의존성 없이 Node 내장 테스트 러너만 쓴다.
 
 ```bash
 npm test
 ```
 
-Apps Script 코드 업로드는 `apps-script/` 안에서 한다. `.clasp.json`이 그 폴더에 있다.
+외부 의존성 없이 Node 내장 테스트 러너만 쓴다. 브라우저 API(`fetch`,
+`localStorage`)는 `test/helpers/browser-shim.js` 의 메모리 대역으로 대신한다.
 
-```bash
-cd apps-script && clasp push
-```
-
-`apps-script/` 아래 코드는 clasp로 관리한다. 웹 편집기에서 직접 고치면 저장소와 어긋나므로, 수정은 항상 로컬에서 하고 `clasp push`로 올린다.
-
-Apps Script는 자체 런타임에서 단위 테스트를 할 수 없다. 그래서 각 소스 파일 끝에 `if (typeof module !== 'undefined')` 가드를 두어 Node에서도 로드되게 하고, `test/helpers/`의 메모리 대역(`Utilities`, `CacheService`, `PropertiesService`, `SpreadsheetApp`)을 상대로 검증한다. 대역이 실제 Google보다 관대하면 테스트가 통과해도 운영에서 깨지므로, 실제 제약을 발견할 때마다 대역에 반영한다.
-
-## 최초 구축 순서
-
-1. 스프레드시트를 만들고 URL에서 ID를 확인한다.
-2. Apps Script 프로젝트 설정 > 스크립트 속성에 `SPREADSHEET_ID`를 등록한다. **코드나 저장소에 넣지 않는다.** 이 스프레드시트에는 수강생 개인정보가 들어가고 이 저장소는 공개 상태다.
-3. 편집기에서 `setupSheets()`를 실행해 13개 시트를 만든다.
-4. 스크립트 속성에 `SEED_ADMIN_EMAIL`과 `SEED_ADMIN_PASSWORD`를 등록하고(이름을 넣으려면 `SEED_ADMIN_NAME`도) `seedAdmin()`을 실행한다. 계정이 만들어지면 세 속성은 자동으로 삭제된다.
-
-`seedAdmin`이 인자 대신 스크립트 속성을 읽는 이유는, Apps Script 편집기의 실행 버튼이 인자 없는 함수만 호출할 수 있기 때문이다. 임시 래퍼 함수에 비밀번호를 적으면 `clasp pull` 한 번으로 공개 저장소에 들어갈 수 있다.
-
-`setupSheets()`는 몇 번을 실행해도 기존 시트를 지우거나 비우지 않는다. 열이 추가되면 빠진 헤더만 뒤에 덧붙인다. 전체 삭제는 `resetAllSheets()` 한 곳에만 있고 확인 문자열을 인자로 넘겨야만 동작하며, 운영 중에는 사용하지 않는다.
+**공식 `supabase-js` 를 쓰지 않는다.** 빌드 단계도 npm 의존성도 두지 않기로
+했고, CDN 에서 스크립트를 받으면 제3자가 개인정보를 다루는 페이지에 임의의
+코드를 실행시킬 수 있다. 쓰는 범위가 인증과 REST 조회뿐이라 직접 만드는 편이
+검증하기도 쉽다. 대신 **토큰 갱신을 직접 책임진다.** `api.js` 의 갱신 경로가
+이 저장소에서 가장 조심해야 할 부분이다.
 
 ## 배포
 
-프론트엔드는 GitHub Pages가 `main` 브랜치 루트에서 서빙한다. 푸시하면 1~2분 안에
-https://igm-edu.github.io/IGM_LMS/ 에 반영된다.
+`main` 에 푸시하면 GitHub Pages 가 1~2분 안에 반영한다. 별도 배포 명령이 없다.
 
-백엔드는 Apps Script 웹앱이다. **코드를 고친 뒤에는 업로드와 배포 갱신을 모두 해야 한다.**
-업로드만 하면 `/exec` 주소가 가리키는 버전은 그대로다.
+DB 변경은 `supabase/migrations/` 에 SQL 파일을 추가하고 대시보드의 SQL Editor
+에서 실행한다. 마이그레이션은 덧붙이기만 하고 기존 파일은 고치지 않는다.
+이미 실행된 파일을 고치면 새로 까는 환경과 지금 환경이 달라진다.
 
-```bash
-cd apps-script && clasp push --force && clasp create-deployment -d "변경 내용"
-```
+**배포 직후 10분간 주의.** GitHub Pages 가 정적 파일에 `max-age=600` 을 준다.
+그 사이 재방문한 브라우저는 예전 파일과 새 파일을 섞어 쓸 수 있다. 모듈 간
+계약(export 이름 등)을 바꾸는 배포에서는 실제로 깨진다. 저절로 풀리지만,
+운영 중이라면 import 경로에 버전 문자열을 붙이는 식의 대응이 필요하다.
 
-새 배포 ID가 나오면 `assets/js/config.js`의 `API_URL`을 그 주소로 바꾼다.
-주소는 반드시 `/exec`로 끝나야 한다. `/dev`로 끝나는 주소는 소유자 전용이라
-수강생이 접근할 수 없다.
+## 접근 제어
 
-`clasp push`가 "Skipping push"만 출력하면 확인 프롬프트가 비대화형 환경에서
-넘어간 것이다. `--force`를 붙인다.
+이 저장소는 공개이고 Supabase 공개 키가 `config.js` 에 들어 있다.
+**접근 제어는 전적으로 RLS 정책이 담당한다.** 정책 하나를 잘못 쓰면 수강생
+개인정보가 통째로 열린다. `supabase/migrations/002_security.sql` 을 고칠 때는
+반드시 수강생 토큰으로 직접 두드려 확인한다. 확인 방법과 지난 결과는
+`.superpowers/sdd/progress-supabase.md` 에 있다.
 
-## 알려진 한계
+특히 다음 네 가지는 설계할 때 놓치기 쉬워 주석으로 이유를 남겨 두었다.
 
-비밀번호 해싱 반복 횟수는 3,000회다. OWASP 권고는 60만 회지만 Apps Script는 HMAC을 API 호출로 처리해 호출당 약 0.47ms가 들고, 권고치를 지키면 로그인 한 번에 4분 이상이 걸린다. 스프레드시트가 유출되면 약한 비밀번호는 오프라인 공격에 무너진다고 보아야 한다. 자세한 판단 근거와 대체 방어선은 설계 문서 7장에 있다.
+- 정책 안에서 `profiles` 를 조회하면 무한 재귀가 난다. `security definer` 로 감싼다.
+- **RLS 는 행 단위다.** 열 제한은 `grant update (열목록)` 으로 따로 해야 한다.
+- 열 권한은 로그인한 모두에게 같이 적용된다. 관리자도 예외가 아니라서
+  역할·상태 변경은 `003_rpc.sql` 의 전용 함수로만 한다.
+- **테이블 구조가 곧 API 다.** 퀴즈 정답이 문제와 같은 행에 있으면 그대로
+  내려간다. `quiz_answer_keys` 를 분리한 이유다.
 
 ## 주의
 
 - 교육생·임원 개인정보가 포함된 파일은 커밋하지 않는다.
-- 스프레드시트 ID, 계정 정보, API 키는 스크립트 속성이나 `.env`로 분리한다. `.gitignore`가 `.env`와 `.clasprc.json`을 제외한다.
+- `sb_secret_...` 키와 DB 비밀번호는 RLS 를 전부 우회한다. **저장소 폴더 안에
+  두지 않는다.** `.gitignore` 로 막아 두었지만 무시 규칙은 마지막 방어선이지
+  보관 장소의 허가가 아니다.
+- Project URL 과 `sb_publishable_...` 키는 공개해도 된다. 브라우저에 실리는
+  것을 전제로 만들어진 값이다.
