@@ -46,6 +46,8 @@ label {
 input[type="email"],
 input[type="password"],
 input[type="date"],
+input[type="number"],
+select,
 input:not([type]) {
   display: block;
   width: 100%;
@@ -131,3 +133,112 @@ button[type="submit"]:disabled {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+/* ------------------------------------------------------------------ */
+/* 관리자 화면                                                          */
+/* ------------------------------------------------------------------ */
+
+.card-wide { max-width: 44rem; }
+
+.brand a { color: inherit; text-decoration: none; }
+.brand a:hover { text-decoration: underline; }
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.row-between h2 { margin: 0; }
+
+.row-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+
+/* 좁은 화면에서는 두 칸을 한 줄씩 내린다. 교육장에서 태블릿으로 여는 경우가 있다. */
+@media (max-width: 30rem) {
+  .row-two { grid-template-columns: 1fr; }
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.row-button {
+  flex: 1;
+  display: block;
+  padding: 0.875rem 0.25rem;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.row-button:hover { background: #f6f8fa; }
+
+.row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-detail {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.badge {
+  padding: 0.0625rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+button.secondary,
+button.danger {
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button.secondary { color: var(--text); }
+button.danger { color: var(--error); }
+
+button.secondary:disabled,
+button.danger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 저장/취소가 나란히 놓이는 자리에서 제출 버튼이 폭을 다 먹지 않게 한다. */
+.row-two button[type="submit"],
+.row-two button.secondary { width: 100%; }

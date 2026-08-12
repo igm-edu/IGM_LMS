@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>클래스 관리 · IGM 이러닝</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <main class="card card-wide">
+    <p class="brand"><a href="index.html">IGM 이러닝</a> · 클래스 관리</p>
+
+    <section id="view-loading">
+      <p class="note">불러오는 중입니다.</p>
+    </section>
+
+    <section id="view-denied" hidden>
+      <h2>접근할 수 없습니다</h2>
+      <p class="note" id="denied-reason"></p>
+      <p class="switch"><a href="index.html">처음으로</a></p>
+    </section>
+
+    <section id="view-admin" hidden>
+      <div class="row-between">
+        <h2>클래스</h2>
+        <button type="button" class="secondary" id="new-class">새 클래스</button>
+      </div>
+      <p class="message" id="message-list" role="alert"></p>
+      <ul class="list" id="class-list"></ul>
+      <p class="note" id="class-empty" hidden>등록된 클래스가 없습니다.</p>
+    </section>
+
+    <section id="view-class" hidden>
+      <p class="switch"><button type="button" class="link" id="back-to-list">← 클래스 목록</button></p>
+      <h2 id="class-title">클래스</h2>
+
+      <form id="form-class" novalidate>
+        <label>과정명<input name="class_name" required></label>
+        <label>기수<input name="batch" required></label>
+        <label>담당 강사
+          <select name="instructor_id" id="instructor-select">
+            <option value="">미정</option>
+          </select>
+        </label>
+        <div class="row-two">
+          <label>시작일<input type="date" name="start_date"></label>
+          <label>종료일<input type="date" name="end_date"></label>
+        </div>
+        <div class="row-two">
+          <label>수료 기준 시청률(%)<input type="number" name="watch_rate_threshold" min="0" max="100" required></label>
+          <label>퀴즈 합격 점수<input type="number" name="quiz_pass_score" min="0" max="100" required></label>
+        </div>
+        <label>상태
+          <select name="status">
+            <option>모집중</option>
+            <option>진행중</option>
+            <option>종료</option>
+          </select>
+        </label>
+        <label class="consent">
+          <input type="checkbox" name="quiz_retry_allowed">
+          <span>퀴즈 재응시를 허용합니다.</span>
+        </label>
+        <p class="message" id="message-class" role="alert"></p>
+        <button type="submit">저장</button>
+      </form>
+
+      <div id="lesson-area" hidden>
+        <div class="row-between">
+          <h2>차시</h2>
+          <button type="button" class="secondary" id="new-lesson">차시 추가</button>
+        </div>
+        <p class="message" id="message-lesson-list" role="alert"></p>
+        <ul class="list" id="lesson-list"></ul>
+        <p class="note" id="lesson-empty" hidden>등록된 차시가 없습니다.</p>
+
+        <form id="form-lesson" novalidate hidden>
+          <h3 id="lesson-form-title">차시 추가</h3>
+          <div class="row-two">
+            <label>순서<input type="number" name="lesson_order" min="1" required></label>
+            <label>제목<input name="title" required></label>
+          </div>
+          <label>영상 주소
+            <input name="video_url" placeholder="https://" required>
+            <span class="hint">주소를 넣으면 길이를 자동으로 잽니다. 실패하면 직접 입력하세요.</span>
+          </label>
+          <label>영상 길이(초)<input type="number" name="video_duration_sec" min="1" required>
+            <span class="hint" id="duration-hint"></span></label>
+          <p class="message" id="message-lesson" role="alert"></p>
+          <div class="row-two">
+            <button type="submit">저장</button>
+            <button type="button" class="secondary" id="cancel-lesson">취소</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -20,6 +20,9 @@ function setMessage(id, text) {
 function showHome(user) {
   document.getElementById('home-name').textContent = user.name;
   document.getElementById('home-company').textContent = user.company ? ' · ' + user.company : '';
+  // 링크를 감추는 것은 편의일 뿐 방어가 아니다. 주소를 직접 쳐서 들어가도
+  // 관리자 화면이 역할을 다시 확인하고, 실제 차단은 서버의 RLS 정책이 한다.
+  document.getElementById('home-admin').hidden = user.role !== 'admin';
   show('home');
 }
 
