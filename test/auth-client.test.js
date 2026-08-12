@@ -206,7 +206,7 @@ test('내 프로필은 본인 id로 조회한다', async () => {
   }
 });
 
-test('세션은 있는데 프로필 행이 없으면 그렇다고 알려준다', async () => {
+test('프로필 행이 없으면 세션을 지우고 다시 로그인하라고 한다', async () => {
   await load();
   installServer();
   await auth.login('a@b.com', 'abcd1234');
@@ -218,6 +218,10 @@ test('세션은 있는데 프로필 행이 없으면 그렇다고 알려준다',
       assert.strictEqual(err.code, 'NO_PROFILE');
       return true;
     });
+    // 관리자가 계정을 지워도 토큰은 만료 전까지 유효하다. 세션을 남겨두면
+    // 새로고침할 때마다 같은 오류 화면에 갇힌다.
+    assert.strictEqual(api.getSession(), null);
+    assert.strictEqual(auth.isLoggedIn(), false);
   } finally {
     shim.restoreFetch();
   }

@@ -104,8 +104,11 @@ export async function me() {
 
   const rows = await rest('/profiles?select=' + PROFILE_FIELDS + '&id=eq.' + session.user_id);
   if (!rows || !rows.length) {
-    // 계정은 있는데 프로필 행이 없는 상태. 가입 트리거가 실패했을 때 생긴다.
-    throw new ApiError('NO_PROFILE', '계정 정보를 찾을 수 없습니다. 관리자에게 문의해 주세요.');
+    // 프로필 행이 없는 상태다. 관리자가 계정을 지웠거나 가입 트리거가 실패했을 때
+    // 생긴다. 토큰 자체는 아직 유효해서 세션을 남겨두면 새로고침할 때마다 같은
+    // 오류에 갇힌다. 이 세션으로 할 수 있는 일이 없으므로 지운다.
+    clearSession();
+    throw new ApiError('NO_PROFILE', '계정 정보를 찾을 수 없습니다. 다시 로그인해 주세요.');
   }
   return rows[0];
 }
