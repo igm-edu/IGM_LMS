@@ -14,6 +14,12 @@ Supabase 대시보드 > SQL Editor 에서 아래 순서대로 **한 파일씩** 
 6. `migrations/006_recalc_watch_rate.sql` — 영상 길이가 바뀌면 시청률 재계산
 7. `migrations/007_submit_quiz.sql` — 퀴즈 채점 (서버에서만 채점)
 8. `migrations/008_submit_quiz_fix.sql` — 007의 모호한 열 참조 수정 (**필수**)
+9. `migrations/009_recalc_watch_rate_fix.sql` — 006에 security definer 추가 (**필수**)
+
+**이미 실행한 파일을 다시 실행하면** `create trigger` 에서 "already exists" 로
+멈춘다. 그 자체는 무해하지만 **뒤에 있는 문장까지 건너뛴다.** 어디까지
+적용됐는지 헷갈리면 파일을 다시 돌리지 말고, 그 기능을 직접 시켜 보고
+동작으로 판단할 것.
 
 **001만 실행한 상태로 두지 말 것.** 그 사이에는 RLS가 꺼져 있어 테이블이
 공개 상태다. 세 파일을 연달아 실행한다.
