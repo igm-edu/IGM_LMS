@@ -93,6 +93,26 @@
           </div>
         </form>
       </div>
+
+      <div id="enroll-area" hidden>
+        <div class="row-between">
+          <h2>수강생</h2>
+          <button type="button" class="secondary" id="toggle-enroll">수강생 추가</button>
+        </div>
+        <p class="message" id="message-roster" role="alert"></p>
+        <ul class="list" id="roster-list"></ul>
+        <p class="note" id="roster-empty" hidden>등록된 수강생이 없습니다.</p>
+
+        <div id="enroll-panel" hidden>
+          <label>수강생 검색
+            <input id="student-search" placeholder="이름 또는 이메일">
+            <span class="hint">비워 두면 이름순으로 앞에서부터 보여줍니다.</span>
+          </label>
+          <p class="message" id="message-enroll" role="alert"></p>
+          <ul class="list" id="student-list"></ul>
+          <p class="note" id="student-empty" hidden>찾는 사람이 없습니다.</p>
+        </div>
+      </div>
     </section>
   </main>
 

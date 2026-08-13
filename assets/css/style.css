@@ -197,6 +197,10 @@ h3 {
 
 .row-button:hover { background: #f6f8fa; }
 
+/* 누를 수 없는 줄(명단 표시)은 커서와 배경 반응을 주지 않는다. */
+.row-static { cursor: default; }
+.row-static:hover { background: none; }
+
 .row-head {
   display: flex;
   align-items: center;

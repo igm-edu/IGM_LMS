@@ -4,6 +4,9 @@ import {
   listLessons, saveLesson, deleteLesson, nextLessonOrder,
   measureVideoDuration, formatDuration,
 } from './classes.js';
+import {
+  listRoster, searchStudents, enroll, cancelEnrollment,
+} from './enrollments.js';
 
 const views = {
   loading: document.getElementById('view-loading'),
@@ -135,17 +138,23 @@ async function openClass(id) {
   editingLessonId = null;
   setMessage('message-class', '');
   setMessage('message-lesson-list', '');
+  setMessage('message-roster', '');
   document.getElementById('form-lesson').hidden = true;
+  document.getElementById('enroll-panel').hidden = true;
+  document.getElementById('student-search').value = '';
   show('class');
 
   if (!id) {
+    // 저장하기 전에는 차시도 수강생도 붙일 곳이 없다.
     document.getElementById('class-title').textContent = '새 클래스';
     document.getElementById('lesson-area').hidden = true;
+    document.getElementById('enroll-area').hidden = true;
     fillClassForm(null);
     return;
   }
 
   document.getElementById('lesson-area').hidden = false;
+  document.getElementById('enroll-area').hidden = false;
   try {
     const row = await getClass(id);
     if (!row) {
@@ -155,6 +164,7 @@ async function openClass(id) {
     document.getElementById('class-title').textContent = row.class_name;
     fillClassForm(row);
     await renderLessons();
+    await renderRoster();
   } catch (err) {
     setMessage('message-class', err.message);
   }
@@ -186,8 +196,10 @@ document.getElementById('form-class').addEventListener('submit', async function 
     currentClassId = saved.id;
     document.getElementById('class-title').textContent = saved.class_name;
     document.getElementById('lesson-area').hidden = false;
+    document.getElementById('enroll-area').hidden = false;
     setMessage('message-class', '저장했습니다.');
     await renderLessons();
+    await renderRoster();
   } catch (err) {
     setMessage('message-class', err.message);
   } finally {
@@ -326,6 +338,139 @@ async function removeLesson(lesson) {
     setMessage('message-lesson-list', err.message);
   }
 }
+
+// ---------------------------------------------------------------------------
+// 수강생
+// ---------------------------------------------------------------------------
+
+let rosterIds = [];
+
+async function renderRoster() {
+  const list = document.getElementById('roster-list');
+  list.textContent = '';
+  setMessage('message-roster', '');
+
+  let rows;
+  try {
+    rows = await listRoster(currentClassId);
+  } catch (err) {
+    setMessage('message-roster', err.message);
+    return;
+  }
+
+  rosterIds = rows.map(function (row) { return row.user_id; });
+  document.getElementById('roster-empty').hidden = rows.length > 0;
+
+  rows.forEach(function (person) {
+    const item = document.createElement('li');
+
+    const info = document.createElement('span');
+    info.className = 'row-button row-static';
+    const head = document.createElement('span');
+    head.className = 'row-head';
+    const name = document.createElement('strong');
+    name.textContent = person.name;
+    head.append(name);
+    const detail = document.createElement('span');
+    detail.className = 'row-detail';
+    detail.textContent = [person.email, person.company, person.position]
+      .filter(Boolean).join(' · ');
+    info.append(head, detail);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'danger';
+    remove.textContent = '취소';
+    remove.addEventListener('click', function () { removeEnrollment(person); });
+
+    item.append(info, remove);
+    list.append(item);
+  });
+}
+
+async function removeEnrollment(person) {
+  if (!window.confirm(person.name + ' 님의 수강을 취소할까요? 시청 기록은 남습니다.')) return;
+  setMessage('message-roster', '');
+  try {
+    await cancelEnrollment(person.user_id, currentClassId);
+    await renderRoster();
+    await renderStudentResults();
+  } catch (err) {
+    setMessage('message-roster', err.message);
+  }
+}
+
+async function renderStudentResults() {
+  const panel = document.getElementById('enroll-panel');
+  if (panel.hidden) return;
+
+  const list = document.getElementById('student-list');
+  list.textContent = '';
+  setMessage('message-enroll', '');
+
+  let rows;
+  try {
+    rows = await searchStudents(document.getElementById('student-search').value);
+  } catch (err) {
+    setMessage('message-enroll', err.message);
+    return;
+  }
+
+  // 이미 등록된 사람은 빼고 보여준다. 눌러도 "이미 등록됨"만 나오는 줄을
+  // 남겨두면 목록만 길어진다.
+  const candidates = rows.filter(function (row) { return rosterIds.indexOf(row.id) === -1; });
+  document.getElementById('student-empty').hidden = candidates.length > 0;
+
+  candidates.forEach(function (person) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'row-button';
+    button.addEventListener('click', function () { addEnrollment(person, button); });
+
+    const head = document.createElement('span');
+    head.className = 'row-head';
+    const name = document.createElement('strong');
+    name.textContent = person.name;
+    head.append(name);
+    const detail = document.createElement('span');
+    detail.className = 'row-detail';
+    detail.textContent = [person.email, person.company].filter(Boolean).join(' · ');
+
+    button.append(head, detail);
+    item.append(button);
+    list.append(item);
+  });
+}
+
+async function addEnrollment(person, button) {
+  setMessage('message-enroll', '');
+  button.disabled = true;
+  try {
+    await enroll(person.id, currentClassId);
+    await renderRoster();
+    await renderStudentResults();
+  } catch (err) {
+    setMessage('message-enroll', err.message);
+    button.disabled = false;
+  }
+}
+
+document.getElementById('toggle-enroll').addEventListener('click', async function () {
+  const panel = document.getElementById('enroll-panel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) {
+    document.getElementById('student-search').focus();
+    await renderStudentResults();
+  }
+});
+
+// 입력이 멈춘 뒤에 찾는다. 글자마다 보내면 요청이 줄줄이 나간다.
+let searchTimer = null;
+document.getElementById('student-search').addEventListener('input', function () {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderStudentResults, 300);
+});
 
 // ---------------------------------------------------------------------------
 // 진입
