@@ -38,6 +38,50 @@ export async function myAttendance(classId) {
   return rows && rows.length ? rows[0] : null;
 }
 
+// ---------------------------------------------------------------------------
+// 수료증
+// ---------------------------------------------------------------------------
+
+const CERT_FIELDS = 'certificate_no,issued_at,attendance!inner(user_id,class_id)';
+
+/** 수료한 사람 전원에게 발급한다. 이미 받은 사람은 already=true 로 돌아온다. */
+export function issueClassCertificates(classId) {
+  return rpc('issue_class_certificates', { p_class_id: classId });
+}
+
+export async function issueCertificate(attendanceId) {
+  const rows = await rpc('issue_certificate', { p_attendance_id: attendanceId });
+  if (!rows || !rows.length) {
+    throw new ApiError('NOT_SAVED', '발급 결과를 받지 못했습니다.');
+  }
+  return rows[0];
+}
+
+/** 발급된 수료증 조회. 발급을 실행하지 않는다. */
+export function classCertificates(classId) {
+  return rest('/certificates?select=' + CERT_FIELDS + '&attendance.class_id=eq.' + classId);
+}
+
+export async function myCertificate(classId) {
+  const session = getSession();
+  if (!session) throw new ApiError('NO_SESSION', '로그인이 필요합니다.');
+  const rows = await rest('/certificates?select=' + CERT_FIELDS
+    + '&attendance.class_id=eq.' + classId
+    + '&attendance.user_id=eq.' + session.user_id);
+  return rows && rows.length ? rows[0] : null;
+}
+
+/** 조회 결과를 user_id 로 찾아 쓸 수 있게 바꾼다. */
+export function certificatesByUser(rows) {
+  const map = {};
+  (rows || []).forEach(function (row) {
+    if (row && row.attendance && row.attendance.user_id) {
+      map[row.attendance.user_id] = row;
+    }
+  });
+  return map;
+}
+
 /**
  * 판정 결과 한 줄 요약.
  * 기준값은 행에 찍힌 것을 쓴다. 클래스의 현재 기준을 쓰면 이미 발급한

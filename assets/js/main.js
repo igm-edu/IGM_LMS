@@ -4,7 +4,7 @@ import {
 } from './learn.js';
 import { formatDuration } from './classes.js';
 import { quizOfLesson, myAttempts, submitQuiz, quizCountForLessons } from './quiz.js';
-import { myAttendance, completionLabel } from './completion.js';
+import { myAttendance, completionLabel, myCertificate } from './completion.js';
 
 const views = {
   login: document.getElementById('view-login'),
@@ -117,8 +117,10 @@ async function openLessons(row) {
     const record = await myAttendance(row.id);
     const hasQuiz = (await quizCountForLessons(
       currentLessons.map(function (lesson) { return lesson.id; }))) > 0;
+    const cert = record && record.is_completed ? await myCertificate(row.id) : null;
     document.getElementById('lessons-completion').textContent =
-      '수료 판정 · ' + completionLabel(record, { hasQuiz: hasQuiz });
+      '수료 판정 · ' + completionLabel(record, { hasQuiz: hasQuiz })
+      + (cert ? ' · 수료증 ' + cert.certificate_no : '');
   } catch (err) {
     document.getElementById('lessons-completion').textContent = '';
   }

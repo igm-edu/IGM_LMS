@@ -16,6 +16,7 @@ Supabase 대시보드 > SQL Editor 에서 아래 순서대로 **한 파일씩** 
 8. `migrations/008_submit_quiz_fix.sql` — 007의 모호한 열 참조 수정 (**필수**)
 9. `migrations/009_recalc_watch_rate_fix.sql` — 006에 security definer 추가 (**필수**)
 10. `migrations/010_judge_completion.sql` — 수료 판정
+11. `migrations/011_issue_certificate.sql` — 수료증 발급 (IGM-연도-일련번호)
 
 **이미 실행한 파일을 다시 실행하면** `create trigger` 에서 "already exists" 로
 멈춘다. 그 자체는 무해하지만 **뒤에 있는 문장까지 건너뛴다.** 어디까지
@@ -59,6 +60,16 @@ update public.profiles set role = 'admin' where email = '본인이메일@igm.co.
 생기는 공개과정 특성상 실제로 걸릴 수 있다. 하루 한 번 깨우는 GitHub Actions
 스케줄을 별도 작업으로 추가할 것. (아직 안 만들었다.)
 
+## 수료증 번호
+
+`IGM-<연도>-<4자리>` (예: `IGM-2026-0001`). 연도는 **수료 시각 기준**이다.
+12월에 수료하고 1월에 발급해도 수료한 해의 번호를 받는다. 발급일 기준으로
+매기면 같은 기수가 두 해로 갈린다.
+
+일련번호는 그해 마지막 번호 + 1 이다. 개수를 세지 않고 최댓값을 쓰는 이유는,
+한 장을 지우면 개수 방식이 이미 나간 번호를 다시 발급하기 때문이다.
+
 ## 아직 만들지 않은 것
 
-- 수료증 발급 — `certificates` 테이블은 있으나 번호 채번과 발급 경로가 없다.
+- 수료증 PDF/이미지 출력. 지금은 번호만 채번한다. `certificates.file_id` 는
+  파일을 붙일 자리로 비워 두었다.

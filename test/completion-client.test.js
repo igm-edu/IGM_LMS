@@ -154,6 +154,86 @@ test('퀴즈가 없는 클래스는 점수 대신 그렇다고 적는다', async
   assert.strictEqual(label.indexOf('0점'), -1);
 });
 
+// ---------------------------------------------------------------------------
+// 수료증
+// ---------------------------------------------------------------------------
+
+test('클래스 일괄 발급은 서버 함수로 보낸다', async () => {
+  await load();
+  shim.installFetch(async () => json([{ user_id: 'U-1', name: '홍길동', certificate_no: 'IGM-2026-0001', already: false }]));
+  try {
+    const rows = await comp.issueClassCertificates('C-1');
+    assert.strictEqual(rows[0].certificate_no, 'IGM-2026-0001');
+    assert.match(String(shim.lastRequest().url), /\/rpc\/issue_class_certificates$/);
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('한 장 발급도 서버 함수로 보내고 빈 결과를 넘기지 않는다', async () => {
+  await load();
+  shim.installFetch(async () => json([]));
+  try {
+    await assert.rejects(() => comp.issueCertificate('A-1'), (err) => {
+      assert.strictEqual(err.code, 'NOT_SAVED');
+      return true;
+    });
+    assert.deepStrictEqual(JSON.parse(shim.lastRequest().options.body), { p_attendance_id: 'A-1' });
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('수료증 조회는 발급을 실행하지 않는다', async () => {
+  await load();
+  shim.installFetch(async () => json([]));
+  try {
+    await comp.classCertificates('C-1');
+    const url = decodeURIComponent(String(shim.lastRequest().url));
+    // 목록을 여는 것만으로 번호가 채번되면 안 된다.
+    assert.strictEqual(url.indexOf('/rpc/'), -1);
+    assert.match(url, /attendance!inner/);
+    assert.match(url, /attendance\.class_id=eq\.C-1/);
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('내 수료증은 본인 것만 조회한다', async () => {
+  await load();
+  shim.installFetch(async () => json([{ certificate_no: 'IGM-2026-0007', attendance: { user_id: 'U-1', class_id: 'C-1' } }]));
+  try {
+    const row = await comp.myCertificate('C-1');
+    assert.strictEqual(row.certificate_no, 'IGM-2026-0007');
+    assert.match(decodeURIComponent(String(shim.lastRequest().url)), /attendance\.user_id=eq\.U-1/);
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('수료증이 없으면 null을 돌려준다', async () => {
+  await load();
+  shim.installFetch(async () => json([]));
+  try {
+    assert.strictEqual(await comp.myCertificate('C-1'), null);
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('수료증 목록을 user_id로 찾을 수 있게 바꾼다', async () => {
+  await load();
+  const map = comp.certificatesByUser([
+    { certificate_no: 'IGM-2026-0001', attendance: { user_id: 'U-1' } },
+    { certificate_no: 'IGM-2026-0002', attendance: { user_id: 'U-2' } },
+    { certificate_no: 'IGM-2026-0003' },   // 조인이 막혀 비어 온 행
+  ]);
+  assert.strictEqual(map['U-1'].certificate_no, 'IGM-2026-0001');
+  assert.strictEqual(map['U-2'].certificate_no, 'IGM-2026-0002');
+  assert.strictEqual(Object.keys(map).length, 2);
+  assert.deepStrictEqual(comp.certificatesByUser(null), {});
+});
+
 test('판정 전에는 그렇다고 알려준다', async () => {
   await load();
   assert.strictEqual(comp.completionLabel(null), '아직 판정하지 않았습니다.');

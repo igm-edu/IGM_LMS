@@ -11,7 +11,10 @@ import {
   quizOfLesson, saveQuiz, listQuestionsWithKeys, correctOptionOf,
   nextQuestionOrder, saveQuestion, deleteQuestion,
 } from './quiz.js';
-import { judgeClass, classAttendance, completionLabel } from './completion.js';
+import {
+  judgeClass, classAttendance, completionLabel,
+  issueClassCertificates, classCertificates, certificatesByUser,
+} from './completion.js';
 import { quizCountForLessons } from './quiz.js';
 
 const views = {
@@ -377,9 +380,11 @@ async function renderRoster() {
   // 이미 내려진 판정만 읽는다. 목록을 여는 것만으로 다시 판정하면
   // 수료 시각이 흔들린다.
   let judged = {};
+  let certs = {};
   let hasQuiz = true;
   try {
     (await classAttendance(currentClassId)).forEach(function (row) { judged[row.user_id] = row; });
+    certs = certificatesByUser(await classCertificates(currentClassId));
     hasQuiz = (await quizCountForLessons(currentLessons.map(function (l) { return l.id; }))) > 0;
   } catch (err) {
     setMessage('message-roster', err.message);
@@ -404,7 +409,8 @@ async function renderRoster() {
     detail.className = 'row-detail';
     detail.textContent = [person.email, person.company, person.position]
       .filter(Boolean).join(' · ')
-      + ' / ' + completionLabel(judged[person.user_id], { hasQuiz: hasQuiz });
+      + ' / ' + completionLabel(judged[person.user_id], { hasQuiz: hasQuiz })
+      + (certs[person.user_id] ? ' · 수료증 ' + certs[person.user_id].certificate_no : '');
     info.append(head, detail);
 
     const remove = document.createElement('button');
@@ -495,6 +501,24 @@ document.getElementById('judge-class').addEventListener('click', async function 
     const done = rows.filter(function (row) { return row.is_completed; }).length;
     document.getElementById('judge-note').textContent =
       rows.length + '명 판정 · ' + done + '명 수료';
+    await renderRoster();
+  } catch (err) {
+    setMessage('message-roster', err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('issue-certs').addEventListener('click', async function () {
+  const button = document.getElementById('issue-certs');
+  setMessage('message-roster', '');
+  button.disabled = true;
+  try {
+    const rows = await issueClassCertificates(currentClassId);
+    const fresh = rows.filter(function (row) { return !row.already; }).length;
+    document.getElementById('judge-note').textContent = rows.length
+      ? '수료자 ' + rows.length + '명 · 새로 발급 ' + fresh + '장'
+      : '수료자가 없습니다. 판정을 먼저 실행하세요.';
     await renderRoster();
   } catch (err) {
     setMessage('message-roster', err.message);
