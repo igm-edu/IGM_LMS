@@ -44,11 +44,30 @@
     </section>
 
     <section id="view-home" hidden>
-      <h2>환영합니다</h2>
+      <h2>내 과정</h2>
       <p><strong id="home-name"></strong><span id="home-company"></span></p>
-      <p class="note">수강 중인 과정은 곧 이곳에 표시됩니다.</p>
+      <p class="message" id="message-home" role="alert"></p>
+      <ul class="list" id="my-class-list"></ul>
+      <p class="note" id="my-class-empty" hidden>수강 중인 과정이 없습니다.</p>
       <p class="switch" id="home-admin" hidden><a href="admin.html">클래스 관리</a></p>
       <button type="button" id="do-logout">로그아웃</button>
+    </section>
+
+    <section id="view-lessons" hidden>
+      <p class="switch"><button type="button" class="link" id="back-to-home">← 내 과정</button></p>
+      <h2 id="lessons-title"></h2>
+      <p class="note" id="lessons-summary"></p>
+      <p class="message" id="message-lessons" role="alert"></p>
+      <ul class="list" id="my-lesson-list"></ul>
+      <p class="note" id="my-lesson-empty" hidden>등록된 차시가 없습니다.</p>
+    </section>
+
+    <section id="view-player" hidden>
+      <p class="switch"><button type="button" class="link" id="back-to-lessons">← 차시 목록</button></p>
+      <h2 id="player-title"></h2>
+      <video id="player" controls playsinline preload="metadata"></video>
+      <p class="note" id="player-progress"></p>
+      <p class="message" id="message-player" role="alert"></p>
     </section>
   </main>
 

@@ -201,6 +201,14 @@ h3 {
 .row-static { cursor: default; }
 .row-static:hover { background: none; }
 
+video {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  border-radius: 6px;
+  background: #000;
+}
+
 .row-head {
   display: flex;
   align-items: center;
