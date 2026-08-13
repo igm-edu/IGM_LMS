@@ -3,6 +3,7 @@ import {
   myClasses, myLessons, progressOf, saveProgress, shouldSave, progressLabel,
 } from './learn.js';
 import { formatDuration } from './classes.js';
+import { quizOfLesson, myAttempts, submitQuiz } from './quiz.js';
 
 const views = {
   login: document.getElementById('view-login'),
@@ -10,6 +11,7 @@ const views = {
   home: document.getElementById('view-home'),
   lessons: document.getElementById('view-lessons'),
   player: document.getElementById('view-player'),
+  quiz: document.getElementById('view-quiz'),
 };
 
 function show(name) {
@@ -152,7 +154,7 @@ function setPlayerProgress(progress) {
       : '';
 }
 
-function openPlayer(lesson) {
+async function openPlayer(lesson) {
   currentLesson = lesson;
   const progress = progressOf(lesson);
   lastSavedSec = progress.max_watched_sec;
@@ -160,7 +162,16 @@ function openPlayer(lesson) {
   document.getElementById('player-title').textContent = lesson.lesson_order + '차시 · ' + lesson.title;
   setMessage('message-player', '');
   setPlayerProgress(progress);
+  document.getElementById('player-quiz').hidden = true;
   show('player');
+
+  // 퀴즈가 있는 차시에만 버튼을 보인다. 조회가 실패해도 재생은 막지 않는다.
+  quizOfLesson(lesson.id).then(function (quiz) {
+    lessonQuiz = quiz;
+    document.getElementById('player-quiz').hidden = !quiz;
+  }).catch(function () {
+    lessonQuiz = null;
+  });
 
   player.src = lesson.video_url;
   // 이어보기. 끝까지 본 영상은 처음부터 다시 틀어 준다.
@@ -212,6 +223,8 @@ function stopPlayback() {
   player.removeAttribute('src');
   player.load();
   currentLesson = null;
+  lessonQuiz = null;
+  document.getElementById('player-quiz').hidden = true;
 }
 
 document.getElementById('back-to-home').addEventListener('click', function () {
@@ -222,6 +235,101 @@ document.getElementById('back-to-home').addEventListener('click', function () {
 document.getElementById('back-to-lessons').addEventListener('click', async function () {
   stopPlayback();
   if (currentClass) await openLessons(currentClass);
+});
+
+// ---------------------------------------------------------------------------
+// 퀴즈 응시
+// ---------------------------------------------------------------------------
+
+let lessonQuiz = null;
+
+function attemptSummary(attempts) {
+  if (!attempts.length) return '아직 응시하지 않았습니다.';
+  const best = attempts.reduce(function (top, row) {
+    return Number(row.score) > Number(top.score) ? row : top;
+  });
+  return '응시 ' + attempts.length + '회 · 최고 ' + Math.round(Number(best.score)) + '점'
+    + (attempts.some(function (row) { return row.is_passed; }) ? ' · 합격' : '');
+}
+
+async function openQuiz() {
+  if (!lessonQuiz) return;
+  // 영상을 틀어둔 채로 문제를 풀면 진도가 계속 올라간다. 멈추되 차시는 기억해 둔다.
+  player.pause();
+
+  document.getElementById('quiz-title').textContent = lessonQuiz.quiz_title;
+  document.getElementById('quiz-info').textContent =
+    (lessonQuiz.quiz_questions || []).length + '문항 · 합격 '
+    + Math.round(Number(lessonQuiz.pass_score) || 0) + '점';
+  document.getElementById('quiz-result').textContent = '';
+  setMessage('message-quiz-take', '');
+  document.getElementById('submit-quiz').disabled = false;
+  show('quiz');
+
+  try {
+    document.getElementById('quiz-history').textContent = attemptSummary(await myAttempts(lessonQuiz.id));
+  } catch (err) {
+    document.getElementById('quiz-history').textContent = '';
+  }
+
+  const wrap = document.getElementById('question-fields');
+  wrap.textContent = '';
+  (lessonQuiz.quiz_questions || []).forEach(function (question) {
+    const item = document.createElement('li');
+    const text = document.createElement('p');
+    text.textContent = question.question_text + ' (' + question.score + '점)';
+    item.append(text);
+
+    [1, 2, 3, 4].forEach(function (number) {
+      const option = question['option' + number];
+      if (!option) return;   // 비어 있는 보기는 그리지 않는다
+      const label = document.createElement('label');
+      label.className = 'choice';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'q_' + question.id;
+      input.value = String(number);
+      const span = document.createElement('span');
+      span.textContent = option;
+      label.append(input, span);
+      item.append(label);
+    });
+
+    wrap.append(item);
+  });
+}
+
+document.getElementById('go-quiz').addEventListener('click', openQuiz);
+
+document.getElementById('back-to-player').addEventListener('click', function () {
+  show('player');
+});
+
+document.getElementById('form-quiz-take').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  setMessage('message-quiz-take', '');
+
+  const answers = [];
+  (lessonQuiz.quiz_questions || []).forEach(function (question) {
+    const picked = document.querySelector('input[name="q_' + question.id + '"]:checked');
+    if (picked) answers.push({ question_id: question.id, selected_option: Number(picked.value) });
+  });
+
+  const unanswered = (lessonQuiz.quiz_questions || []).length - answers.length;
+  if (unanswered > 0 && !window.confirm(unanswered + '문항이 비어 있습니다. 그대로 제출할까요?')) return;
+
+  const button = document.getElementById('submit-quiz');
+  button.disabled = true;
+  try {
+    const result = await submitQuiz(lessonQuiz.id, answers);
+    document.getElementById('quiz-result').textContent =
+      Math.round(Number(result.score)) + '점 · ' + result.correct_count + '/' + result.question_count
+      + '문항 정답 · ' + (result.is_passed ? '합격' : '불합격');
+    document.getElementById('quiz-history').textContent = attemptSummary(await myAttempts(lessonQuiz.id));
+  } catch (err) {
+    setMessage('message-quiz-take', err.message);
+    button.disabled = false;
+  }
 });
 
 function formValues(form) {

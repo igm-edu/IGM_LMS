@@ -68,6 +68,22 @@
       <video id="player" controls playsinline preload="metadata"></video>
       <p class="note" id="player-progress"></p>
       <p class="message" id="message-player" role="alert"></p>
+      <p class="switch" id="player-quiz" hidden>
+        <button type="button" class="secondary" id="go-quiz">퀴즈 풀기</button>
+      </p>
+    </section>
+
+    <section id="view-quiz" hidden>
+      <p class="switch"><button type="button" class="link" id="back-to-player">← 차시로</button></p>
+      <h2 id="quiz-title"></h2>
+      <p class="note" id="quiz-info"></p>
+      <p class="note" id="quiz-history"></p>
+      <form id="form-quiz-take" novalidate>
+        <ol class="questions" id="question-fields"></ol>
+        <p class="message" id="message-quiz-take" role="alert"></p>
+        <button type="submit" id="submit-quiz">제출하기</button>
+      </form>
+      <p class="note" id="quiz-result"></p>
     </section>
   </main>
 

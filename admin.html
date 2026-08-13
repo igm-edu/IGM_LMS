@@ -114,6 +114,62 @@
         </div>
       </div>
     </section>
+
+    <section id="view-quiz" hidden>
+      <p class="switch"><button type="button" class="link" id="back-to-class">← 클래스</button></p>
+      <h2 id="quiz-lesson-title"></h2>
+
+      <form id="form-quiz" novalidate>
+        <div class="row-two">
+          <label>퀴즈 제목<input name="quiz_title" required></label>
+          <label>합격 점수(%)<input type="number" name="pass_score" min="0" max="100" required></label>
+        </div>
+        <p class="message" id="message-quiz" role="alert"></p>
+        <button type="submit">퀴즈 저장</button>
+      </form>
+
+      <div id="question-area" hidden>
+        <div class="row-between">
+          <h2>문항</h2>
+          <button type="button" class="secondary" id="new-question">문항 추가</button>
+        </div>
+        <p class="note" id="question-total"></p>
+        <p class="message" id="message-question-list" role="alert"></p>
+        <ul class="list" id="question-list"></ul>
+        <p class="note" id="question-empty" hidden>등록된 문항이 없습니다.</p>
+
+        <form id="form-question" novalidate hidden>
+          <h3 id="question-form-title">문항 추가</h3>
+          <div class="row-two">
+            <label>순서<input type="number" name="question_order" min="1" required></label>
+            <label>배점<input type="number" name="score" min="1" required></label>
+          </div>
+          <label>문제<input name="question_text" required></label>
+          <div class="row-two">
+            <label>보기 1<input name="option1" required></label>
+            <label>보기 2<input name="option2" required></label>
+          </div>
+          <div class="row-two">
+            <label>보기 3<input name="option3"></label>
+            <label>보기 4<input name="option4"></label>
+          </div>
+          <label>정답
+            <select name="correct_option">
+              <option value="1">1번</option>
+              <option value="2">2번</option>
+              <option value="3">3번</option>
+              <option value="4">4번</option>
+            </select>
+            <span class="hint">비어 있는 보기는 정답으로 지정할 수 없습니다.</span>
+          </label>
+          <p class="message" id="message-question" role="alert"></p>
+          <div class="row-two">
+            <button type="submit">저장</button>
+            <button type="button" class="secondary" id="cancel-question">취소</button>
+          </div>
+        </form>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="assets/js/admin.js"></script>

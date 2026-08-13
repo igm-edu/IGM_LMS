@@ -7,12 +7,17 @@ import {
 import {
   listRoster, searchStudents, enroll, cancelEnrollment,
 } from './enrollments.js';
+import {
+  quizOfLesson, saveQuiz, listQuestionsWithKeys, correctOptionOf,
+  nextQuestionOrder, saveQuestion, deleteQuestion,
+} from './quiz.js';
 
 const views = {
   loading: document.getElementById('view-loading'),
   denied: document.getElementById('view-denied'),
   admin: document.getElementById('view-admin'),
   class: document.getElementById('view-class'),
+  quiz: document.getElementById('view-quiz'),
 };
 
 let currentClassId = null;
@@ -247,13 +252,19 @@ async function renderLessons() {
     detail.textContent = formatDuration(lesson.video_duration_sec);
     open.append(head, detail);
 
+    const quizButton = document.createElement('button');
+    quizButton.type = 'button';
+    quizButton.className = 'secondary';
+    quizButton.textContent = '퀴즈';
+    quizButton.addEventListener('click', function () { openQuiz(lesson); });
+
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'danger';
     remove.textContent = '삭제';
     remove.addEventListener('click', function () { removeLesson(lesson); });
 
-    item.append(open, remove);
+    item.append(open, quizButton, remove);
     list.append(item);
   });
 }
@@ -470,6 +481,196 @@ let searchTimer = null;
 document.getElementById('student-search').addEventListener('input', function () {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(renderStudentResults, 300);
+});
+
+// ---------------------------------------------------------------------------
+// 퀴즈 출제
+// ---------------------------------------------------------------------------
+
+let quizLesson = null;
+let currentQuiz = null;
+let currentQuestions = [];
+let editingQuestionId = null;
+
+async function openQuiz(lesson) {
+  quizLesson = lesson;
+  currentQuiz = null;
+  currentQuestions = [];
+  editingQuestionId = null;
+
+  document.getElementById('quiz-lesson-title').textContent =
+    lesson.lesson_order + '차시 · ' + lesson.title;
+  setMessage('message-quiz', '');
+  setMessage('message-question-list', '');
+  document.getElementById('form-question').hidden = true;
+  document.getElementById('question-area').hidden = true;
+  document.getElementById('form-quiz').reset();
+  show('quiz');
+
+  try {
+    currentQuiz = await quizOfLesson(lesson.id);
+  } catch (err) {
+    setMessage('message-quiz', err.message);
+    return;
+  }
+
+  if (!currentQuiz) {
+    // 아직 퀴즈가 없는 차시다. 제목과 합격 점수를 저장하면 문항을 붙일 수 있다.
+    document.getElementById('form-quiz').pass_score.value = 60;
+    return;
+  }
+
+  const form = document.getElementById('form-quiz');
+  form.quiz_title.value = currentQuiz.quiz_title;
+  form.pass_score.value = currentQuiz.pass_score;
+  document.getElementById('question-area').hidden = false;
+  await renderQuestions();
+}
+
+document.getElementById('form-quiz').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  const form = event.target;
+  setMessage('message-quiz', '');
+  const values = formValues(form);
+
+  busy(form, true);
+  try {
+    currentQuiz = await saveQuiz(quizLesson.id, {
+      quiz_title: values.quiz_title,
+      pass_score: Number(values.pass_score),
+    }, currentQuiz && currentQuiz.id);
+    document.getElementById('question-area').hidden = false;
+    setMessage('message-quiz', '저장했습니다.');
+    await renderQuestions();
+  } catch (err) {
+    setMessage('message-quiz', err.message);
+  } finally {
+    busy(form, false);
+  }
+});
+
+async function renderQuestions() {
+  const list = document.getElementById('question-list');
+  list.textContent = '';
+  setMessage('message-question-list', '');
+
+  try {
+    currentQuestions = await listQuestionsWithKeys(currentQuiz.id);
+  } catch (err) {
+    setMessage('message-question-list', err.message);
+    return;
+  }
+
+  const total = currentQuestions.reduce(function (sum, q) { return sum + (Number(q.score) || 0); }, 0);
+  // 배점 합이 100이 아니어도 된다. 점수는 백분율로 환산되므로 그렇다고 알려만 준다.
+  document.getElementById('question-total').textContent =
+    currentQuestions.length + '문항 · 배점 합계 ' + total + '점 (점수는 100점 만점으로 환산됩니다)';
+  document.getElementById('question-empty').hidden = currentQuestions.length > 0;
+
+  currentQuestions.forEach(function (question) {
+    const correct = correctOptionOf(question);
+    const item = document.createElement('li');
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'row-button';
+    open.addEventListener('click', function () { openQuestionForm(question); });
+
+    const head = document.createElement('span');
+    head.className = 'row-head';
+    const order = document.createElement('span');
+    order.className = 'badge';
+    order.textContent = question.question_order + '번';
+    const text = document.createElement('strong');
+    text.textContent = question.question_text;
+    head.append(order, text);
+
+    const detail = document.createElement('span');
+    detail.className = 'row-detail';
+    detail.textContent = '배점 ' + question.score + '점 · 정답 '
+      + (correct ? correct + '번' : '미지정');
+    open.append(head, detail);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'danger';
+    remove.textContent = '삭제';
+    remove.addEventListener('click', function () { removeQuestion(question); });
+
+    item.append(open, remove);
+    list.append(item);
+  });
+}
+
+function openQuestionForm(question) {
+  const form = document.getElementById('form-question');
+  form.hidden = false;
+  form.reset();
+  setMessage('message-question', '');
+  editingQuestionId = question ? question.id : null;
+  document.getElementById('question-form-title').textContent = question ? '문항 수정' : '문항 추가';
+
+  if (question) {
+    form.question_order.value = question.question_order;
+    form.score.value = question.score;
+    form.question_text.value = question.question_text;
+    form.option1.value = question.option1 || '';
+    form.option2.value = question.option2 || '';
+    form.option3.value = question.option3 || '';
+    form.option4.value = question.option4 || '';
+    form.correct_option.value = String(correctOptionOf(question) || 1);
+  } else {
+    form.question_order.value = nextQuestionOrder(currentQuestions);
+    form.score.value = 10;
+  }
+  form.question_text.focus();
+}
+
+document.getElementById('form-question').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  const form = event.target;
+  setMessage('message-question', '');
+  const values = formValues(form);
+
+  busy(form, true);
+  try {
+    await saveQuestion(currentQuiz.id, {
+      question_order: Number(values.question_order),
+      score: Number(values.score),
+      question_text: values.question_text,
+      option1: values.option1,
+      option2: values.option2,
+      option3: values.option3,
+      option4: values.option4,
+      correct_option: Number(values.correct_option),
+    }, editingQuestionId);
+    form.hidden = true;
+    await renderQuestions();
+  } catch (err) {
+    setMessage('message-question', err.message);
+  } finally {
+    busy(form, false);
+  }
+});
+
+document.getElementById('cancel-question').addEventListener('click', function () {
+  document.getElementById('form-question').hidden = true;
+});
+
+async function removeQuestion(question) {
+  if (!window.confirm(question.question_order + '번 문항을 삭제할까요?')) return;
+  setMessage('message-question-list', '');
+  try {
+    await deleteQuestion(question.id);
+    await renderQuestions();
+  } catch (err) {
+    setMessage('message-question-list', err.message);
+  }
+}
+
+document.getElementById('new-question').addEventListener('click', function () { openQuestionForm(null); });
+document.getElementById('back-to-class').addEventListener('click', async function () {
+  await openClass(currentClassId);
 });
 
 // ---------------------------------------------------------------------------
