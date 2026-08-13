@@ -1,0 +1,146 @@
+/*
+ * 수료증 한 장.
+ *
+ * 배경과 좌표는 원본 PPTX 양식(수료증_양식.pptx)에서 그대로 가져왔다.
+ * 양식의 슬라이드 크기는 11.69 x 8.22in 이고, 이름·과정명·날짜는 모두
+ * 가로 중앙에 놓인다. 아래 위치 값은 그 좌표를 비율로 바꾼 것이다.
+ *
+ *   이름   y 3.180in / 8.22 = 38.69%
+ *   과정명 y 4.469in / 8.22 = 54.37%
+ *   날짜   y 6.440in / 8.22 = 78.35%
+ *
+ * 화면에서는 --zoom 으로 축소해 보여주고 인쇄할 때는 원래 크기로 낸다.
+ * 크기를 px 로 다시 계산하지 않고 통째로 축소해야 인쇄물과 화면이 어긋나지 않는다.
+ */
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('../fonts/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: block;   /* 이름이 다른 폰트로 잠깐 보였다 바뀌면 흉하다 */
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('../fonts/Pretendard-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  --sheet-w: 297mm;
+  --sheet-h: 208.8mm;   /* 양식의 8.22in. A4(210mm)보다 1.2mm 짧다 */
+  --ink: #1a1a1a;
+  --zoom: 1;
+}
+
+* { box-sizing: border-box; }
+
+.cert-body {
+  margin: 0;
+  padding: 1rem;
+  background: #f4f5f7;
+  color: var(--ink);
+  font-family: 'Pretendard', system-ui, -apple-system, 'Malgun Gothic', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cert-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: var(--sheet-w);
+  font-size: 0.875rem;
+}
+
+.cert-bar a { color: #1f6feb; }
+.cert-status { flex: 1; color: #666; }
+
+.cert-bar button {
+  padding: 0.5rem 0.875rem;
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------- */
+/* 종이                                                                    */
+/* --------------------------------------------------------------------- */
+
+.sheet {
+  position: relative;
+  width: var(--sheet-w);
+  height: var(--sheet-h);
+  flex: none;
+  background: #fff url('../img/certificate-bg.jpg') center / 100% 100% no-repeat;
+  transform: scale(var(--zoom));
+  transform-origin: top center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  /* 배경이 인쇄에서 빠지면 빈 종이가 나온다 */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* 축소된 만큼 아래 여백이 남으므로 감싸는 자리를 따로 잡는다. */
+.sheet-space {
+  width: var(--sheet-w);
+  height: calc(var(--sheet-h) * var(--zoom));
+  max-width: 100%;
+}
+
+.cert-name,
+.cert-course,
+.cert-date,
+.cert-no {
+  position: absolute;
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 이름 · 과정명 · 날짜는 전부 가로 중앙 정렬이다. 양식의 상자 폭이 좁아
+   긴 이름이 넘칠 수 있어, 상자 대신 전체 폭에 가운데 정렬로 둔다. */
+.cert-name  { left: 0; right: 0; top: 38.69%; font-size: 34pt; }
+.cert-course{ left: 0; right: 0; top: 54.37%; font-size: 25pt; }
+.cert-date  { left: 0; right: 0; top: 78.35%; font-size: 18pt; }
+
+/* 기수는 과정명보다 작게. 양식이 28pt 본문에 18pt 기수를 썼다. */
+.cert-batch { font-size: 0.72em; }
+
+/* 발급 번호는 조회·대조용이라 눈에 띌 필요가 없다. 금색 테두리 안쪽 아래. */
+.cert-no {
+  left: 7.5%;
+  top: 91%;
+  font-weight: 400;
+  font-size: 9pt;
+  letter-spacing: 0.04em;
+  color: #6b6b6b;
+  text-align: left;
+}
+
+/* --------------------------------------------------------------------- */
+/* 인쇄                                                                    */
+/* --------------------------------------------------------------------- */
+
+@page {
+  size: A4 landscape;
+  margin: 0;
+}
+
+@media print {
+  .cert-body { padding: 0; background: #fff; display: block; }
+  .cert-bar { display: none; }
+  .sheet-space { width: auto; height: auto; }
+  .sheet {
+    transform: none;          /* 인쇄는 원래 크기로 */
+    box-shadow: none;
+    margin: 0 auto;
+  }
+}

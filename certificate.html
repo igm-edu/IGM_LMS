@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>수료증 · IGM 이러닝</title>
+  <link rel="stylesheet" href="assets/css/certificate.css">
+</head>
+<body class="cert-body">
+  <div class="cert-bar" id="cert-bar">
+    <a href="index.html">← 내 과정</a>
+    <span class="cert-status" id="cert-status">불러오는 중입니다.</span>
+    <button type="button" id="do-print" hidden>인쇄 / PDF 저장</button>
+  </div>
+
+  <!--
+    A4 가로(297 x 210mm) 한 장. 배경은 원본 PPTX 양식에서 그대로 가져왔고,
+    이름 · 과정명 · 날짜의 위치와 크기는 그 양식의 좌표를 따른다.
+  -->
+  <div class="sheet-space" id="sheet-space" hidden>
+  <div class="sheet" id="sheet">
+    <div class="cert-name" id="cert-name"></div>
+    <div class="cert-course">
+      <span id="cert-course-name"></span><span class="cert-batch" id="cert-batch"></span>
+    </div>
+    <div class="cert-date" id="cert-date"></div>
+    <div class="cert-no" id="cert-no"></div>
+  </div>
+  </div>
+
+  <script type="module" src="assets/js/certificate.js"></script>
+</body>
+</html>

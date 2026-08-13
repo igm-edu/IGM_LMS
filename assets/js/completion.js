@@ -71,6 +71,46 @@ export async function myCertificate(classId) {
   return rows && rows.length ? rows[0] : null;
 }
 
+/**
+ * 수료증 한 장에 인쇄할 내용.
+ * 이름·과정명·수료일은 정책이 허용하는 범위에서만 조인되어 온다.
+ * 수강생은 자기 것만, 관리자와 담당 강사는 담당 클래스 것을 볼 수 있다.
+ */
+export async function certificateDetail(certificateNo) {
+  const rows = await rest('/certificates?select=certificate_no,issued_at,'
+    + 'attendance!inner(completed_at,profiles!inner(name),classes!inner(class_name,batch))'
+    + '&certificate_no=eq.' + encodeURIComponent(certificateNo));
+  return rows && rows.length ? rows[0] : null;
+}
+
+/** 발급 번호 하나를 인쇄용 값으로 편다. 조인이 막혀 비어 오면 null. */
+export function certificateFields(row) {
+  if (!row || !row.attendance) return null;
+  const a = row.attendance;
+  const person = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
+  const klass = Array.isArray(a.classes) ? a.classes[0] : a.classes;
+  if (!person || !klass) return null;
+  return {
+    certificate_no: row.certificate_no,
+    name: person.name,
+    class_name: klass.class_name,
+    batch: klass.batch,
+    completed_at: a.completed_at || row.issued_at,
+  };
+}
+
+/**
+ * 수료일 표기. 양식이 "June 18, 2025" 형태를 쓰고 있어 그대로 따른다.
+ * 사용자의 지역 설정과 무관하게 같은 모양이 나오도록 en-US 로 고정한다.
+ */
+export function formatCertificateDate(value) {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Seoul',
+  }).format(date);
+}
+
 /** 조회 결과를 user_id 로 찾아 쓸 수 있게 바꾼다. */
 export function certificatesByUser(rows) {
   const map = {};

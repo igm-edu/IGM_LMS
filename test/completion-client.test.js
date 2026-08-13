@@ -234,6 +234,65 @@ test('수료증 목록을 user_id로 찾을 수 있게 바꾼다', async () => {
   assert.deepStrictEqual(comp.certificatesByUser(null), {});
 });
 
+test('수료증 상세는 이름·과정·수료일을 함께 가져온다', async () => {
+  await load();
+  shim.installFetch(async () => json([]));
+  try {
+    await comp.certificateDetail('IGM-2026-0001');
+    const url = decodeURIComponent(String(shim.lastRequest().url));
+    assert.match(url, /certificate_no=eq\.IGM-2026-0001/);
+    assert.match(url, /attendance!inner\(/);
+    assert.match(url, /profiles!inner\(name\)/);
+    assert.match(url, /classes!inner\(class_name,batch\)/);
+  } finally {
+    shim.restoreFetch();
+  }
+});
+
+test('상세를 인쇄용 값으로 편다', async () => {
+  await load();
+  const fields = comp.certificateFields({
+    certificate_no: 'IGM-2026-0001', issued_at: '2026-08-20T00:00:00Z',
+    attendance: {
+      completed_at: '2026-08-13T04:00:00Z',
+      profiles: { name: '홍길동' },
+      classes: { class_name: 'AI 활용 실무', batch: '2026-1기' },
+    },
+  });
+  assert.strictEqual(fields.name, '홍길동');
+  assert.strictEqual(fields.class_name, 'AI 활용 실무');
+  assert.strictEqual(fields.batch, '2026-1기');
+  // 발급일이 아니라 수료일을 찍는다. 12월 수료 / 1월 발급이면 날짜가 달라진다.
+  assert.strictEqual(fields.completed_at, '2026-08-13T04:00:00Z');
+});
+
+test('조인이 막혀 비어 오면 null을 돌려준다', async () => {
+  await load();
+  // 남의 번호를 넣으면 certificates 행은 못 보고, 봐도 profiles 가 빈다.
+  assert.strictEqual(comp.certificateFields(null), null);
+  assert.strictEqual(comp.certificateFields({ certificate_no: 'X' }), null);
+  assert.strictEqual(comp.certificateFields({
+    certificate_no: 'X', attendance: { profiles: null, classes: { class_name: 'A' } },
+  }), null);
+});
+
+test('수료일이 없으면 발급일로 대신한다', async () => {
+  await load();
+  const fields = comp.certificateFields({
+    certificate_no: 'IGM-2026-0002', issued_at: '2026-09-01T00:00:00Z',
+    attendance: { completed_at: null, profiles: { name: '김철수' }, classes: { class_name: 'B', batch: '1기' } },
+  });
+  assert.strictEqual(fields.completed_at, '2026-09-01T00:00:00Z');
+});
+
+test('날짜는 양식과 같은 영문 표기로 낸다', async () => {
+  await load();
+  // 한국 시간 기준 8월 13일. 보는 사람의 지역 설정과 무관하게 같아야 한다.
+  assert.strictEqual(comp.formatCertificateDate('2026-08-13T04:00:00Z'), 'August 13, 2026');
+  assert.strictEqual(comp.formatCertificateDate('2025-06-18T00:00:00Z'), 'June 18, 2025');
+  assert.strictEqual(comp.formatCertificateDate('이상한값'), '');
+});
+
 test('판정 전에는 그렇다고 알려준다', async () => {
   await load();
   assert.strictEqual(comp.completionLabel(null), '아직 판정하지 않았습니다.');

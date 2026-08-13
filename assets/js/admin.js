@@ -409,9 +409,17 @@ async function renderRoster() {
     detail.className = 'row-detail';
     detail.textContent = [person.email, person.company, person.position]
       .filter(Boolean).join(' · ')
-      + ' / ' + completionLabel(judged[person.user_id], { hasQuiz: hasQuiz })
-      + (certs[person.user_id] ? ' · 수료증 ' + certs[person.user_id].certificate_no : '');
+      + ' / ' + completionLabel(judged[person.user_id], { hasQuiz: hasQuiz });
     info.append(head, detail);
+
+    if (certs[person.user_id]) {
+      const link = document.createElement('a');
+      link.className = 'row-detail';
+      link.href = 'certificate.html?no='
+        + encodeURIComponent(certs[person.user_id].certificate_no);
+      link.textContent = '수료증 ' + certs[person.user_id].certificate_no;
+      info.append(link);
+    }
 
     const remove = document.createElement('button');
     remove.type = 'button';

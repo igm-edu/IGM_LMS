@@ -118,9 +118,15 @@ async function openLessons(row) {
     const hasQuiz = (await quizCountForLessons(
       currentLessons.map(function (lesson) { return lesson.id; }))) > 0;
     const cert = record && record.is_completed ? await myCertificate(row.id) : null;
-    document.getElementById('lessons-completion').textContent =
-      '수료 판정 · ' + completionLabel(record, { hasQuiz: hasQuiz })
-      + (cert ? ' · 수료증 ' + cert.certificate_no : '');
+    const line = document.getElementById('lessons-completion');
+    line.textContent = '수료 판정 · ' + completionLabel(record, { hasQuiz: hasQuiz });
+    if (cert) {
+      line.append(' · ');
+      const link = document.createElement('a');
+      link.href = 'certificate.html?no=' + encodeURIComponent(cert.certificate_no);
+      link.textContent = '수료증 ' + cert.certificate_no;
+      line.append(link);
+    }
   } catch (err) {
     document.getElementById('lessons-completion').textContent = '';
   }
