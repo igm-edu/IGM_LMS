@@ -10,6 +10,8 @@ Supabase 대시보드 > SQL Editor 에서 아래 순서대로 **한 파일씩** 
 2. `migrations/002_security.sql` — RLS 정책, 권한, 트리거
 3. `migrations/003_rpc.sql` — 관리자 전용 함수
 4. `migrations/004_watch_log_delete.sql` — 시청 기록 삭제 권한 (002의 누락 보완)
+5. `migrations/005_lesson_url_duration.sql` — 영상 주소·길이를 함께 바꾸게 강제
+6. `migrations/006_recalc_watch_rate.sql` — 영상 길이가 바뀌면 시청률 재계산
 
 **001만 실행한 상태로 두지 말 것.** 그 사이에는 RLS가 꺼져 있어 테이블이
 공개 상태다. 세 파일을 연달아 실행한다.
