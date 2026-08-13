@@ -22,11 +22,13 @@ function fitToScreen() {
   const space = document.getElementById('sheet-space');
   if (space.hidden) return;
 
-  const paper = sheet.getBoundingClientRect().width / (Number(
-    getComputedStyle(document.documentElement).getPropertyValue('--zoom')) || 1);
-  const room = document.body.clientWidth - 32;
-  const zoom = Math.min(1, room / paper);
-  document.documentElement.style.setProperty('--zoom', String(zoom));
+  // offsetWidth 는 transform 의 영향을 받지 않는 원래 폭이다.
+  // getBoundingClientRect 를 쓰면 이미 줄어든 값이 나와 계산이 겹친다.
+  const paper = sheet.offsetWidth;
+  if (!paper) return;
+  // documentElement 를 재야 한다. body 는 넘치는 자식 때문에 넓어져 있을 수 있다.
+  const room = document.documentElement.clientWidth - 32;
+  document.documentElement.style.setProperty('--zoom', String(Math.min(1, room / paper)));
 }
 
 function render(fields) {
