@@ -13,6 +13,7 @@ Supabase 대시보드 > SQL Editor 에서 아래 순서대로 **한 파일씩** 
 5. `migrations/005_lesson_url_duration.sql` — 영상 주소·길이를 함께 바꾸게 강제
 6. `migrations/006_recalc_watch_rate.sql` — 영상 길이가 바뀌면 시청률 재계산
 7. `migrations/007_submit_quiz.sql` — 퀴즈 채점 (서버에서만 채점)
+8. `migrations/008_submit_quiz_fix.sql` — 007의 모호한 열 참조 수정 (**필수**)
 
 **001만 실행한 상태로 두지 말 것.** 그 사이에는 RLS가 꺼져 있어 테이블이
 공개 상태다. 세 파일을 연달아 실행한다.

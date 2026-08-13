@@ -315,6 +315,12 @@ document.getElementById('form-quiz-take').addEventListener('submit', async funct
     if (picked) answers.push({ question_id: question.id, selected_option: Number(picked.value) });
   });
 
+  if (!answers.length) {
+    // 하나도 고르지 않은 제출은 응시 횟수만 쓴다. 재응시가 막힌 클래스라면
+    // 그 한 번으로 끝난다. 확인을 묻지 않고 바로 막는다.
+    setMessage('message-quiz-take', '답을 하나 이상 선택해 주세요.');
+    return;
+  }
   const unanswered = (lessonQuiz.quiz_questions || []).length - answers.length;
   if (unanswered > 0 && !window.confirm(unanswered + '문항이 비어 있습니다. 그대로 제출할까요?')) return;
 
