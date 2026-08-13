@@ -62,6 +62,17 @@ export async function quizOfLesson(lessonId) {
   return rows && rows.length ? rows[0] : null;
 }
 
+/**
+ * 차시 여러 개에 딸린 퀴즈 수.
+ * 수료 판정 표시에서 "퀴즈 없음" 을 구분하는 데 쓴다. 퀴즈가 없는 클래스는
+ * 저장된 점수 0 이 0점을 받은 것처럼 읽히기 때문이다.
+ */
+export async function quizCountForLessons(lessonIds) {
+  if (!lessonIds || !lessonIds.length) return 0;
+  const rows = await rest('/quizzes?select=id&lesson_id=in.(' + lessonIds.join(',') + ')');
+  return rows ? rows.length : 0;
+}
+
 export function myAttempts(quizId) {
   return rest('/quiz_attempts?select=id,score,is_passed,submitted_at'
     + '&quiz_id=eq.' + quizId + '&order=submitted_at.desc');

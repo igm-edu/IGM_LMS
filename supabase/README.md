@@ -15,6 +15,7 @@ Supabase 대시보드 > SQL Editor 에서 아래 순서대로 **한 파일씩** 
 7. `migrations/007_submit_quiz.sql` — 퀴즈 채점 (서버에서만 채점)
 8. `migrations/008_submit_quiz_fix.sql` — 007의 모호한 열 참조 수정 (**필수**)
 9. `migrations/009_recalc_watch_rate_fix.sql` — 006에 security definer 추가 (**필수**)
+10. `migrations/010_judge_completion.sql` — 수료 판정
 
 **이미 실행한 파일을 다시 실행하면** `create trigger` 에서 "already exists" 로
 멈춘다. 그 자체는 무해하지만 **뒤에 있는 문장까지 건너뛴다.** 어디까지
@@ -60,5 +61,4 @@ update public.profiles set role = 'admin' where email = '본인이메일@igm.co.
 
 ## 아직 만들지 않은 것
 
-- `judge_completion()` — 수료 판정. 출결·수료 기능과 함께 작성한다.
-- 퀴즈 화면(관리자 출제 / 수강생 응시) — 서버 함수와 데이터 계층은 있다.
+- 수료증 발급 — `certificates` 테이블은 있으나 번호 채번과 발급 경로가 없다.

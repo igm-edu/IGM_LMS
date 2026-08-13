@@ -11,6 +11,8 @@ import {
   quizOfLesson, saveQuiz, listQuestionsWithKeys, correctOptionOf,
   nextQuestionOrder, saveQuestion, deleteQuestion,
 } from './quiz.js';
+import { judgeClass, classAttendance, completionLabel } from './completion.js';
+import { quizCountForLessons } from './quiz.js';
 
 const views = {
   loading: document.getElementById('view-loading'),
@@ -372,6 +374,17 @@ async function renderRoster() {
   rosterIds = rows.map(function (row) { return row.user_id; });
   document.getElementById('roster-empty').hidden = rows.length > 0;
 
+  // 이미 내려진 판정만 읽는다. 목록을 여는 것만으로 다시 판정하면
+  // 수료 시각이 흔들린다.
+  let judged = {};
+  let hasQuiz = true;
+  try {
+    (await classAttendance(currentClassId)).forEach(function (row) { judged[row.user_id] = row; });
+    hasQuiz = (await quizCountForLessons(currentLessons.map(function (l) { return l.id; }))) > 0;
+  } catch (err) {
+    setMessage('message-roster', err.message);
+  }
+
   rows.forEach(function (person) {
     const item = document.createElement('li');
 
@@ -381,11 +394,17 @@ async function renderRoster() {
     head.className = 'row-head';
     const name = document.createElement('strong');
     name.textContent = person.name;
-    head.append(name);
+    const mark = document.createElement('span');
+    mark.className = 'badge';
+    mark.textContent = judged[person.user_id]
+      ? (judged[person.user_id].is_completed ? '수료' : '미수료')
+      : '미판정';
+    head.append(name, mark);
     const detail = document.createElement('span');
     detail.className = 'row-detail';
     detail.textContent = [person.email, person.company, person.position]
-      .filter(Boolean).join(' · ');
+      .filter(Boolean).join(' · ')
+      + ' / ' + completionLabel(judged[person.user_id], { hasQuiz: hasQuiz });
     info.append(head, detail);
 
     const remove = document.createElement('button');
@@ -466,6 +485,23 @@ async function addEnrollment(person, button) {
     button.disabled = false;
   }
 }
+
+document.getElementById('judge-class').addEventListener('click', async function () {
+  const button = document.getElementById('judge-class');
+  setMessage('message-roster', '');
+  button.disabled = true;
+  try {
+    const rows = await judgeClass(currentClassId);
+    const done = rows.filter(function (row) { return row.is_completed; }).length;
+    document.getElementById('judge-note').textContent =
+      rows.length + '명 판정 · ' + done + '명 수료';
+    await renderRoster();
+  } catch (err) {
+    setMessage('message-roster', err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 document.getElementById('toggle-enroll').addEventListener('click', async function () {
   const panel = document.getElementById('enroll-panel');

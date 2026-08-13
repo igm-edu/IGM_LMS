@@ -3,7 +3,8 @@ import {
   myClasses, myLessons, progressOf, saveProgress, shouldSave, progressLabel,
 } from './learn.js';
 import { formatDuration } from './classes.js';
-import { quizOfLesson, myAttempts, submitQuiz } from './quiz.js';
+import { quizOfLesson, myAttempts, submitQuiz, quizCountForLessons } from './quiz.js';
+import { myAttendance, completionLabel } from './completion.js';
 
 const views = {
   login: document.getElementById('view-login'),
@@ -109,6 +110,18 @@ async function openLessons(row) {
     '전체 ' + currentLessons.length + '차시 중 ' + done + '차시 수강 완료'
     + ' · 수료 기준 ' + Math.round(Number(row.watch_rate_threshold) || 0) + '%';
   document.getElementById('my-lesson-empty').hidden = currentLessons.length > 0;
+
+  // 수료 여부는 관리자가 판정을 실행해야 정해진다. 판정 전이라도 화면이
+  // 비어 보이지 않게 그렇다고 적어 준다.
+  try {
+    const record = await myAttendance(row.id);
+    const hasQuiz = (await quizCountForLessons(
+      currentLessons.map(function (lesson) { return lesson.id; }))) > 0;
+    document.getElementById('lessons-completion').textContent =
+      '수료 판정 · ' + completionLabel(record, { hasQuiz: hasQuiz });
+  } catch (err) {
+    document.getElementById('lessons-completion').textContent = '';
+  }
 
   currentLessons.forEach(function (lesson) {
     const progress = progressOf(lesson);
